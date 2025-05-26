@@ -1,0 +1,21 @@
+repositories:
+  curobo_ros:
+    type: git
+    url: https://github.com/Lab-CORO/curobo_ros.git
+    version: main
+  curobo_msgs:
+    type: git
+    url: https://github.com/Lab-CORO/curobo_msgs.git
+    version: main
+  curobo_rviz:
+    type: git
+    url: https://github.com/Lab-CORO/curobo_rviz.git
+    version: main
+  tool_box:
+    type: git
+    url: https://github.com/Lab-CORO/tool_box.git
+    version: main
+  pointcloud_fusion:
+    type: git
+    url: https://github.com/Lab-CORO/pointcloud_fusion.git
+    version: main
