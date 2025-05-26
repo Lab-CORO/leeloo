@@ -13,12 +13,18 @@ The stack is built around **ROS 2 Humble**, CuRobo for optimisation-based contro
 
 ## Table of Contents
 
-1. [Quick start](#quick-start)
-2. [Hardware & network setup](#hardware--network-setup)
-3. [Building the workspace](#building-the-workspace)
-4. [Running Leeloo](#running-leeloo)
-5. [Repository layout](#repository-layout)
-6. [Troubleshooting](#troubleshooting)
+- [Leeloo 🤖 – Mobile Manipulator ROS 2 Workspace](#leeloo---mobile-manipulator-ros-2-workspace)
+  - [The stack is built around **ROS 2 Humble**, CuRobo for optimisation-based control, and containerised with Docker for reproducible deployments.](#the-stack-is-built-around-ros-2-humble-curobo-for-optimisation-based-control-and-containerised-with-docker-for-reproducible-deployments)
+  - [Table of Contents](#table-of-contents)
+  - [Quick start](#quick-start)
+  - [Hardware \& network setup](#hardware--network-setup)
+  - [Building the workspace](#building-the-workspace)
+  - [Running Leeloo](#running-leeloo)
+    - [Typical launch arguments](#typical-launch-arguments)
+  - [External packages](#external-packages)
+  - [Repository layout](#repository-layout)
+  - [Troubleshooting](#troubleshooting)
+  - [Contributing](#contributing)
 
 ---
 
@@ -49,7 +55,7 @@ vcs import < my.repos --recursive        # pulls external sources
 | ----------------- | ----------------- | ------------------------------------------------- |
 | Robot PC (Host)   | `192.168.137.20`  | Static address on USB-C tether                    |
 | UR arm controller | `192.168.137.100` | Set in teach pendant                              |
-| Ridgeback base    | `192.168.137.101` | DHCP or static                                    |
+| Ridgeback base    | `192.168.137.xxx` | DHCP or static                                    |
 | Azure Kinects     | USB-C             | Udev rule `99-k4a.rules` sets correct permissions |
 
 *Connect the USB-C tether before launching; the launch files assume the above addressing.*
@@ -63,7 +69,7 @@ Inside the **running container**:
 ```bash
 # Source ROS and build
 source /opt/ros/humble/setup.bash
-colcon build --symlink-install
+colcon build 
 # Add to every new terminal
 source install/setup.bash
 ```
@@ -85,6 +91,20 @@ ros2 launch leeloo start_system.launch.py
 | `use_sim_time:=false` | false   | Switch to Gazebo/ignition sim |
 | `joystick:=false`     | false   | Enable game-pad tele-op       |
 | `record:=false`       | false   | Rosbag record all topics      |
+
+
+---
+
+## External packages
+Fetched automatically by **`vcs import < my.repos --recursive`**.
+
+| Package | Purpose |
+| ------- | ------- |
+| [`curobo_ros`](https://github.com/Lab-CORO/curobo_ros) | Exposes CuRobo inverse & forward kinematics and trajectory-generation as ROS 2 services. |
+| [`curobo_msgs`](https://github.com/Lab-CORO/curobo_msgs) | Custom message / service definitions consumed by `curobo_ros`. |
+| [`curobo_rviz`](https://github.com/Lab-CORO/curobo_rviz) | RViz 2 plugin for live-tuning CuRobo parameters. |
+| [`tool_box`](https://github.com/Lab-CORO/tool_box) | Utilities for camera & robot calibration (AprilTag tracking, depth–RGB alignment). |
+| [`pointcloud_fusion`](https://github.com/Lab-CORO/pointcloud_fusion) | Real-time merging of multi-camera point clouds (Realsense 2 & Azure Kinect). |
 
 ---
 
