@@ -39,6 +39,7 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
         -v ./curobo_msgs:/home/ros2_ws/src/curobo_msgs\
         -v ./pointcloud_fusion:/home/ros2_ws/src/pointcloud_fusion\
         -v ./tool_box:/home/ros2_ws/src/tool_box \
+        -v ./leeloo:/home/ros2_ws/src/leeloo \
         leeloo_docker:x86 \
         ${branch_arg}
 else
