@@ -40,8 +40,7 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
         -v ./pointcloud_fusion:/home/ros2_ws/src/pointcloud_fusion\
         -v ./tool_box:/home/ros2_ws/src/tool_box \
         -v ./leeloo:/home/ros2_ws/src/leeloo \
-        leeloo_docker:x86 \
-        ${branch_arg}
+        leeloo_docker:x86 
 else
     echo "Detected OS is msys, make sure to have an X server running on your host machine"
     # Exécutez seulement le conteneur Docker avec les options appropriées
@@ -55,8 +54,7 @@ else
         --network host \
         -e DISPLAY=$DISPLAY \
         -v /tmp/.X11-unix:/tmp/.X11-unix \
-        leeloo_docker:x86 \
-        ${branch_arg}
+        leeloo_docker:x86 
 fi
 
 
