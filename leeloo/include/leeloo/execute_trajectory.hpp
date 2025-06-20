@@ -21,6 +21,8 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <cmath>
+
 
 // #include "../../dsr_common2/include/DRFLEx.h"
 
@@ -60,4 +62,5 @@ private:
     std::mutex mtx;
     int iteration = 0;
     int trajectory_size = 0;
+    int loop_control = 0.0;
 };

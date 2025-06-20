@@ -23,8 +23,8 @@ ExecuteTrajectoryNode::ExecuteTrajectoryNode() : Node("ExecuteTrajectory")
     subscription_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>("/leeloo/execute_trajectory", 10, std::bind(&ExecuteTrajectoryNode::sub_trajectory, this, std::placeholders::_1));   
     state_publisher_  = this->create_publisher<std_msgs::msg::Float32>("/leeloo/trajectory_state",10); // give a percentage of the advencement
     dsr_publisher_ = this->create_publisher<dsr_msgs2::msg::SpeedjRtStream>("/dsr01/speedj_rt_stream",10);
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(30), std::bind(&ExecuteTrajectoryNode::speed_rt_stream_timer, this));
-
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&ExecuteTrajectoryNode::speed_rt_stream_timer, this));
+    loop_control = 0;
 }
 
 ExecuteTrajectoryNode::~ExecuteTrajectoryNode()
@@ -38,20 +38,28 @@ void ExecuteTrajectoryNode::speed_rt_stream_timer(){
     }
     if (this->iteration == 0){
         this->trajectory_size = std::size(this->trajectory.points); 
+        this->loop_control = int(this->trajectory.points[0].time_from_start.nanosec / 10000000); // get number of commande to send each loop.
+        RCLCPP_INFO(this->get_logger(), "loop control: %d",  this->loop_control);
     }
-    this->mtx.lock();
-    trajectory_msgs::msg::JointTrajectoryPoint point = this->trajectory.points.front();
-    this->trajectory.points.erase(this->trajectory.points.begin());
-    this->mtx.unlock();
+    // Set the control to 1ms and flexible speed control according to timer dilatation.
+    if (this->iteration % this->loop_control == 0.0 ){
 
-    if (point.velocities.size() >= 6) {
-    for (size_t i = 0; i < 6; ++i) {
-        this->msg_speed.vel[i] = point.velocities[i] * 180 / 3.1415;
+    // loop control time send a new message, else send the same than before
+        this->mtx.lock();
+        trajectory_msgs::msg::JointTrajectoryPoint point = this->trajectory.points.front();
+        this->trajectory.points.erase(this->trajectory.points.begin());
+        this->mtx.unlock();
+
+        if (point.velocities.size() >= 6) {
+        for (size_t i = 0; i < 6; ++i) {
+            this->msg_speed.vel[i] = point.velocities[i] * 180 / 3.1415;
+        }
+        } else {
+            RCLCPP_WARN(this->get_logger(), "Received fewer than 6 velocity values.");
+        }
+        this->msg_speed.time = point.time_from_start.nanosec * 1e-9;
     }
-    } else {
-        RCLCPP_WARN(this->get_logger(), "Received fewer than 6 velocity values.");
-    }
-    this->msg_speed.time = 0.03;
+
         
     // send traj to dsr 
     dsr_publisher_->publish(this->msg_speed);
