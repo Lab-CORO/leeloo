@@ -49,7 +49,7 @@ public:
     void sub_trajectory(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg);
     void speed_rt_stream_timer();
 private:  
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr state_publisher_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr state_publisher_;
     rclcpp::Publisher<dsr_msgs2::msg::SpeedjRtStream>::SharedPtr dsr_publisher_;
     rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr subscription_;
     rclcpp::TimerBase::SharedPtr timer_;
@@ -58,4 +58,6 @@ private:
     dsr_msgs2::msg::SpeedjRtStream msg_speed;
     std_msgs::msg::Float32 progression; 
     std::mutex mtx;
+    int iteration = 0;
+    int trajectory_size = 0;
 };
