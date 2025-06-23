@@ -26,7 +26,6 @@ ExecuteTrajectoryNode::ExecuteTrajectoryNode() : Node("ExecuteTrajectory")
     timer_ = this->create_wall_timer(std::chrono::milliseconds(10), std::bind(&ExecuteTrajectoryNode::speed_rt_stream_timer, this));
     loop_control = 0;
 }
-
 ExecuteTrajectoryNode::~ExecuteTrajectoryNode()
 {
 }
@@ -38,7 +37,7 @@ void ExecuteTrajectoryNode::speed_rt_stream_timer(){
     }
     if (this->iteration == 0){
         this->trajectory_size = std::size(this->trajectory.points); 
-        this->loop_control = int(this->trajectory.points[0].time_from_start.nanosec / 10000000); // get number of commande to send each loop.
+        this->loop_control = int(this->trajectory.points[0].time_from_start.nanosec / 1e7); // get number of commande to send each loop.
         RCLCPP_INFO(this->get_logger(), "loop control: %d",  this->loop_control);
     }
     // Set the control to 1ms and flexible speed control according to timer dilatation.
@@ -57,7 +56,7 @@ void ExecuteTrajectoryNode::speed_rt_stream_timer(){
         } else {
             RCLCPP_WARN(this->get_logger(), "Received fewer than 6 velocity values.");
         }
-        this->msg_speed.time = point.time_from_start.nanosec * 1e-9;
+        this->msg_speed.time = 0.01; // point.time_from_start.nanosec * 1e-9;
     }
 
         
@@ -67,7 +66,7 @@ void ExecuteTrajectoryNode::speed_rt_stream_timer(){
     // send feedback 
     this->iteration += 1;
     std_msgs::msg::Float32 state_msg;
-    state_msg.data = this->iteration / static_cast<float>(this->trajectory_size);
+    state_msg.data = (static_cast<float>(this->iteration)/static_cast<float>(this->loop_control))  / static_cast<float>(this->trajectory_size);
     state_publisher_->publish(state_msg);
 
    
