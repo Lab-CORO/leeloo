@@ -32,7 +32,7 @@ The stack is built around **ROS 2 Humble**, CuRobo for optimisation-based contro
 
 ```bash
 # 1. Clone the repository
-git clone -b main-ros2 https://github.com/Lab-CORO/leeloo.git
+git clone -b leeloo-vr https://github.com/Lab-CORO/leeloo.git
 cd leeloo
 
 # 2. Install vcs and pull external ROS packages

@@ -49,7 +49,6 @@ RUN git clone https://github.com/Lab-CORO/ROS-TCP-Endpoint.git
 # Add Unity ROS2 Doosan
 RUN git clone https://github.com/Lab-CORO/vr_unity_ros_doosan.git
 
-
 ### install gazebo sim for doosan package
 RUN sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable `lsb_release -cs` main" > /etc/apt/sources.list.d/gazebo-stable.list'
 RUN wget http://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add -
