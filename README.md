@@ -32,7 +32,7 @@ The stack is built around **ROS 2 Humble**, CuRobo for optimisation-based contro
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Lab-CORO/leeloo.git
+git clone -b main-ros2 https://github.com/Lab-CORO/leeloo.git
 cd leeloo
 
 # 2. Install vcs and pull external ROS packages
@@ -53,9 +53,10 @@ vcs import < my.repos --recursive        # pulls external sources
 
 | Component         | Default IP / Port | Notes                                             |
 | ----------------- | ----------------- | ------------------------------------------------- |
-| Robot PC (Host)   | `192.168.137.20`  | Static address on USB-C tether                    |
-| UR arm controller | `192.168.137.100` | Set in teach pendant                              |
-| Ridgeback base    | `192.168.137.xxx` | DHCP or static                                    |
+| Robot PC (Host)   | `192.168.50.10`   | Static address on USB-C tether                    |
+| Unity PC (VR)     | `192.168.50.27`   | Static address for Unity                 |
+| UR arm controller | `192.168.50.100`  | Set in teach pendant                              |
+| Ridgeback base    | `192.168.50.213`  | DHCP or static                                    |
 | Azure Kinects     | USB-C             | Udev rule `99-k4a.rules` sets correct permissions |
 
 *Connect the USB-C tether before launching; the launch files assume the above addressing.*

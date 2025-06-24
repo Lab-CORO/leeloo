@@ -43,6 +43,13 @@ RUN git clone -b humble-devel https://github.com/doosan-robotics/doosan-robot2.g
 
 RUN sed -i '771d' /home/ros2_ws/src/Azure_Kinect_ROS_Driver/src/k4a_ros_device.cpp
 
+# Add Unity TCP_ENDPOINT
+RUN git clone https://github.com/Lab-CORO/ROS-TCP-Endpoint.git
+
+# Add Unity ROS2 Doosan
+RUN git clone https://github.com/Lab-CORO/vr_unity_ros_doosan.git
+
+
 ### install gazebo sim for doosan package
 RUN sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable `lsb_release -cs` main" > /etc/apt/sources.list.d/gazebo-stable.list'
 RUN wget http://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add -
@@ -56,5 +63,4 @@ RUN apt-get install -y ros-humble-gazebo-ros-pkgs ros-humble-moveit-msgs\
 
 
 WORKDIR /home/ros2_ws
-RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
-    colcon build"
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build"
