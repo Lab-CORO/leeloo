@@ -40,6 +40,8 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
         -v ./pointcloud_fusion:/home/ros2_ws/src/pointcloud_fusion\
         -v ./tool_box:/home/ros2_ws/src/tool_box \
         -v ./leeloo:/home/ros2_ws/src/leeloo \
+        -v ./vr_unity_ros_doosan:/home/ros2_ws/src/vr_unity_ros_doosan \
+        -v ./ros_tcp_endpoint:/home/ros2_ws_/src/ros_tcp_endpoint\
         vr_leeloo_docker:x86 
 else
     echo "Detected OS is msys, make sure to have an X server running on your host machine"

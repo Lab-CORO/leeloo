@@ -19,3 +19,12 @@ repositories:
     type: git
     url: https://github.com/Lab-CORO/pointcloud_fusion.git
     version: main
+  vr_unity_ros_doosan:
+    type: git
+    url: https://github.com/Lab-CORO/vr_unity_ros_doosan.git
+    version: PFE/setup_main_ros2
+  ros_tcp_endpoint:
+    type: git
+    url: https://github.com/Lab-CORO/ROS-TCP-Endpoint.git
+    version: main
+  

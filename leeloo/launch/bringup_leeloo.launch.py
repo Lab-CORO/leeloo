@@ -61,4 +61,22 @@ def generate_launch_description():
                 {"robot_config_file": "/home/ros2_ws/src/curobo_ros/curobo_doosan/src/m1013/m1013.yml" },
                 ]
         ),
+
+        # Launch Unity tcp_endpoint node
+        Node(
+            package='ros_tcp_endpoint',
+            executable='default_server_endpoint',
+            name='default_server_endpoint',
+            output='screen',
+            parameters=['--ros-args', '-p', 'ROS_IP:=0.0.0.0', '-p', 'ROS_TCP_PORT:=10000'],
+        ),
+
+        # Launch teleop_twist_keyboard node
+        Node(
+            package='teleop_twist_keyboard',
+            executable='teleop_twist_keyboard',
+            name='teleop_twist_keyboard',
+            output='screen',
+            arguments=['--ros-args', '-r', '_ns:=/r100-0597'],
+        ),
     ])
