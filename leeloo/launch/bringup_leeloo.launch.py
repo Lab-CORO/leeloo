@@ -12,12 +12,12 @@ def generate_launch_description():
     # Package share paths
     dsr_bringup_share = get_package_share_directory('dsr_bringup2')
     kinect_driver_share = get_package_share_directory('azure_kinect_ros_driver')
-    fusion_share = get_package_share_directory('pointcloud_fusion')
+    #fusion_share = get_package_share_directory('pointcloud_fusion')
 
     # Launch file paths
     dsr_launch_file = os.path.join(dsr_bringup_share, 'launch', 'dsr_bringup2_rviz.launch.py')
     kinect_launch_file = os.path.join(kinect_driver_share, 'launch', 'driver.launch.py')
-    fusion_launch_file = os.path.join(fusion_share, 'launch', 'pointcloud_fusion.launch.py')
+    #fusion_launch_file = os.path.join(fusion_share, 'launch', 'pointcloud_fusion.launch.py')
 
     return LaunchDescription([
         # Launch arguments for Doosan

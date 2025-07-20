@@ -26,4 +26,4 @@ else
     bash ../docker_curobo/build_docker.sh
 fi
 
-docker build  -t leeloo_docker:${image_tag} -f "x86.dockerfile" . 
+docker build  -t vr_leeloo_docker:${image_tag} -f "x86.dockerfile" . 
