@@ -54,7 +54,5 @@ RUN apt-get install -y ros-humble-gazebo-ros-pkgs ros-humble-moveit-msgs\
         ros-humble-ros2-controllers ros-humble-gazebo-msgs ros-humble-moveit-msgs\
         dbus-x11 ros-humble-moveit-configs-utils ros-humble-moveit-ros-move-group libignition-gazebo6-dev
 
-
 WORKDIR /home/ros2_ws
-RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
-    colcon build"
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build"

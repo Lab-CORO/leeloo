@@ -23,15 +23,18 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
     xhost +local:docker
 
     # Exécutez le conteneur Docker avec les bonnes options
-    docker run --name leeloo_docker -it \
+    docker run --name vr_leeloo_docker -it \
         --privileged \
         -e NVIDIA_DISABLE_REQUIRE=1 \
         -e NVIDIA_DRIVER_CAPABILITIES=all \
         --device=/dev/:/dev/ \
-        --hostname ros1-docker \
-        --add-host ros1-docker:127.0.0.1 \
+        --hostname Leeloo-Docker \
+        --add-host Leeloo-Docker:192.168.50.10 \
+        --add-host cpr-r100-0597:192.168.50.213 \
         --gpus all \
         --network host \
+        -e ROS_DOMAIN_ID=0 \
+        -e ROS_LOCALHOST_ONLY=0 \
         -e DISPLAY=$DISPLAY \
         -v /tmp/.X11-unix:/tmp/.X11-unix \
         -v ./curobo_ros:/home/ros2_ws/src/curobo_ros\
@@ -40,14 +43,14 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
         -v ./pointcloud_fusion:/home/ros2_ws/src/pointcloud_fusion\
         -v ./tool_box:/home/ros2_ws/src/tool_box \
         -v ./leeloo:/home/ros2_ws/src/leeloo \
-        --cap-add=sys_nice \
-        --ulimit rtprio=99 \
-        --ulimit memlock=-1 \
-        leeloo_docker:x86 
+        -v ./vr_unity_ros_doosan:/home/ros2_ws/src/vr_unity_ros_doosan \
+        -v ./ros_tcp_endpoint:/home/ros2_ws/src/ros_tcp_endpoint\
+        -v ./ridgeback_ros2:/home/ros2_ws/src/ridgeback_ros2\
+        vr_leeloo_docker:x86 
 else
     echo "Detected OS is msys, make sure to have an X server running on your host machine"
     # Exécutez seulement le conteneur Docker avec les options appropriées
-    docker run --name leeloo_docker --rm -it \
+    docker run --name vr_leeloo_docker --rm -it \
         --privileged \
         -e NVIDIA_DISABLE_REQUIRE=1 \
         -e NVIDIA_DRIVER_CAPABILITIES=all \
@@ -57,7 +60,8 @@ else
         --network host \
         -e DISPLAY=$DISPLAY \
         -v /tmp/.X11-unix:/tmp/.X11-unix \
-        leeloo_docker:x86 
+        vr_leeloo_docker:x86 \
+        ${branch_arg}
 fi
 
 
