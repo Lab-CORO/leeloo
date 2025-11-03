@@ -1,0 +1,43 @@
+name: Weekly Docker Build
+
+on:
+  schedule:
+    # Tous les dimanches à 20h heure de Toronto (UTC-4 en été = 00h UTC lundi, UTC-5 en hiver = 01h UTC lundi)
+    # On utilise 00h UTC le lundi pour correspondre à 20h dimanche Toronto (été)
+    - cron: '0 0 * * 1'
+  # Permet l'exécution manuelle pour tester
+  workflow_dispatch:
+
+jobs:
+  build-docker-images:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup VCS tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-vcstool
+
+      - name: Import dependencies with vcs
+        run: |
+          vcs import < my.repos --recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build curobo_ros Docker image
+        run: |
+          cd curobo_ros/docker
+          echo 2 | ./build_docker.sh 
+
+      - name: Build leeloo Docker image
+        run: |
+          echo 2 | ./build_docker.sh
+
+      - name: Docker build summary
+        run: |
+          echo "✅ Docker images built successfully!"
+          docker images | grep -E "(curobo_ros|leeloo)"

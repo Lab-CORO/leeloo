@@ -1,4 +1,4 @@
-FROM curobo_docker:x86
+FROM curobo_docker:rtx40xxx
 
 # Add camera azure kinect
 RUN apt update && apt install software-properties-common \
@@ -52,7 +52,7 @@ RUN apt-get install -y ros-humble-gazebo-ros-pkgs ros-humble-moveit-msgs\
         ros-humble-control-msgs ros-humble-realtime-tools ros-humble-xacro\
         ros-humble-joint-state-publisher-gui ros-humble-ros2-control\
         ros-humble-ros2-controllers ros-humble-gazebo-msgs ros-humble-moveit-msgs\
-        dbus-x11 ros-humble-moveit-configs-utils ros-humble-moveit-ros-move-group libignition-gazebo6-dev
+        dbus-x11 ros-humble-moveit-configs-utils ros-humble-moveit-ros-move-group libignition-gazebo6-dev ros-humble-image-proc
 
 
 WORKDIR /home/ros2_ws

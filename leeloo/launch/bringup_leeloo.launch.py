@@ -28,6 +28,23 @@ def generate_launch_description():
         DeclareLaunchArgument('model', default_value='m1013'),
 
 
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='static_transform_publisher_base_link_to_camera_base',
+            arguments=[
+                '-0.1290', # x
+                '-0.3955', # y 
+                '0.8821',  # z
+                '0.3666',   # yaw    (en radians)
+                '0.7854',   # pitch (en radians)
+                '0.2668',   # roll   (en radians)
+                'base_link', #frame_id
+                'camera_base' # child_frame_id
+            ],
+            output='log'
+        ),
+
         # Include Doosan bringup launch file
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(dsr_launch_file),
@@ -40,14 +57,19 @@ def generate_launch_description():
         ),
 
         # Include Azure Kinect driver launch file
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource(kinect_launch_file)
-        # ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(kinect_launch_file)
+        ),
 
         # Include Point Cloud Fusion launch file
         # IncludeLaunchDescription(
         #     PythonLaunchDescriptionSource(fusion_launch_file)
         # ),
+        Node(
+            package='curobo_ros',
+            executable='curobo_gen_traj',
+            output='screen'
+        ),
 
         # Launch robot segmentation node directly
         Node(
@@ -58,6 +80,7 @@ def generate_launch_description():
             parameters=[
                 {"joint_states_topic": "/dsr01/joint_states"},
                 {"point_cloud_topic": "/points2" },
+                {"robot_base_frame": "base_link" },
                 {"robot_config_file": "/home/ros2_ws/src/curobo_ros/curobo_doosan/src/m1013/m1013.yml" },
                 ]
         ),
