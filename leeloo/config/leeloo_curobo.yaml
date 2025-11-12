@@ -1,0 +1,123 @@
+robot_cfg:
+  kinematics:
+    use_usd_kinematics: false
+    usd_path: ""
+    usd_robot_root: ""
+    isaac_usd_path: ""
+    usd_flip_joints:
+      {}
+    usd_flip_joint_limits:
+      []
+    urdf_path: /home/ros2_ws/src/leeloo/urdf/leeloo.urdf
+    asset_root_path: ""
+    base_link: base_link
+    ee_link: link6
+    link_names: ~
+    lock_joints: ~
+    extra_links: ~
+    collision_link_names:
+      - camera_mount
+      - chassis_link
+      - link1
+      - link2
+      - link3
+      - link4
+      - link5
+      - link6
+    collision_spheres:
+      camera_mount:
+        - center: [0, 0, 1.45]
+          radius: 0.069999999999999757
+        - center: [0, 0, 0]
+          radius: 0.070000000000000007
+        - center: [0, 0, 0.14999999999999999]
+          radius: 0.070000000000000007
+        - center: [0, 0, 0.3000000000000001]
+          radius: 0.070000000000000007
+        - center: [0, 0, 0.45000000000000023]
+          radius: 0.070000000000000007
+        - center: [0, 0, 0.60000000000000031]
+          radius: 0.070000000000000007
+        - center: [0, 0, 0.75000000000000044]
+          radius: 0.070000000000000007
+        - center: [0, 0, 0.90000000000000058]
+          radius: 0.070000000000000007
+        - center: [0, 0, 1.0600000000000001]
+          radius: 0.070000000000000007
+        - center: [0, 0, 1.2]
+          radius: 0.070000000000000007
+        - center: [0, 0, 1.3200000000000001]
+          radius: 0.070000000000000007
+      chassis_link:
+        - center: [0.070000000000000007, 0, 0.27000000000000007]
+          radius: 0.3
+      link1:
+        - center: [-0.021999999999999999, -0.01, -0.02]
+          radius: 0.16400000000000001
+      link2:
+        - center: [0.027, 0.001, 0.16700000000000001]
+          radius: 0.127
+        - center: [0.19800000000000001, 0.0040000000000000001, 0.16900000000000001]
+          radius: 0.076999999999999999
+        - center: [0.314, 0.0050000000000000001, 0.16700000000000001]
+          radius: 0.076999999999999999
+        - center: [0.42799999999999999, -0.0030000000000000001, 0.154]
+          radius: 0.076999999999999999
+        - center: [0.58699999999999997, -0.0070000000000000001, 0.158]
+          radius: 0.127
+      link3:
+        - center: [0.0040000000000000001, -0.0060000000000000001, 0.0040000000000000001]
+          radius: 0.10100000000000001
+      link4:
+        - center: [0.0039699999999999996, 0.14701, 0.0039699999999999996]
+          radius: 0.10100000000000001
+        - center: [0, -0.01, -0.40500000000000003]
+          radius: 0.068000000000000005
+        - center: [0.01627, 0.045429999999999998, -0.29214000000000001]
+          radius: 0.080000000000000002
+        - center: [0.016230000000000001, 0.12831999999999999, -0.17449000000000001]
+          radius: 0.080000000000000002
+      link5:
+        - center: [0.0039699999999999996, -6.9999999999999994e-05, 0.0039699999999999996]
+          radius: 0.10100000000000001
+      link6:
+        - center: [0.0046600000000000001, 0.0066699999999999997, -0.042049999999999997]
+          radius: 0.065000000000000002
+    collision_sphere_buffer: 0.01
+    extra_collision_spheres:
+      {}
+    self_collision_ignore:
+      axle_link: [front_rocker_link]
+      base_0: [link1,chassis_link]
+      camera_mount: [chassis_link]
+      front_left_wheel_link: [front_rocker_link]
+      front_right_wheel_link: [front_rocker_link]
+      front_rocker_link: [front_left_wheel_link, front_right_wheel_link, axle_link]
+      link1: [link2, link3, base_0, chassis_link]
+      link2: [link3, link5, link1]
+      link3: [link4, link5, link6, link2]
+      link4: [link5, link6, link3]
+      link5: [link6, link4]
+      link6: [link5]
+      rear_left_wheel_link: [rear_rocker_link]
+      rear_right_wheel_link: [rear_rocker_link]
+      rear_rocker_link: [rear_left_wheel_link, rear_right_wheel_link]
+    self_collision_buffer:
+      imu_link: 0.01
+      link1: 0.01
+      link2: 0.01
+      link3: 0.01
+      link4: 0.01
+      link5: 0.01
+      link6: 0.01
+      mid_mount: 0.01
+      rear_left_wheel_link: 0.01
+    use_global_cumul: true
+    mesh_link_names: ~
+    cspace:
+      joint_names: [joint1, joint2, joint3, joint4, joint5, joint6]
+      retract_config: [0, 0, 0, 0, 0, 0]
+      null_space_weight: [1, 1, 1, 1, 1, 1]
+      cspace_distance_weight: [1, 1, 1, 1, 1, 1]
+      max_jerk: 5e+02
+      max_acceleration: 15.0

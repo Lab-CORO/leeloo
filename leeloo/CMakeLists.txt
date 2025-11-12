@@ -46,6 +46,14 @@ install(DIRECTORY include/
   DESTINATION include/${PROJECT_NAME}
 )
 
+install(DIRECTORY meshes
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY urdf
+  DESTINATION share/${PROJECT_NAME}
+)
+
 
 install(TARGETS
   execute_trajectory
