@@ -1,4 +1,4 @@
-FROM curobo_docker:rtx40xxx
+FROM curobo_ros:ampere-dev
 
 # Add camera azure kinect
 RUN apt update && apt install software-properties-common \
