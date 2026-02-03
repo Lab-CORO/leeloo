@@ -1,4 +1,4 @@
-FROM curobo_docker:rtx40xxx
+FROM curobo_ros:ampere-dev
 
 # Add camera azure kinect
 RUN apt update && apt install software-properties-common \
@@ -58,3 +58,9 @@ RUN apt-get install -y ros-humble-gazebo-ros-pkgs ros-humble-moveit-msgs\
 WORKDIR /home/ros2_ws
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
     colcon build"
+
+# Forcer la version MKL (optionnel mais recommandé pour la stabilité)
+RUN pip install mkl==2023.0.0 mkl-devel==2023.0.0 --force-reinstall --no-cache-dir
+
+# Créer les liens symboliques
+RUN cd /usr/local/lib && for lib in libmkl_*.so.2; do [ -f "$lib" ] && ln -sf "$lib" "$(basename "$lib" .so.2).so.1"; done
