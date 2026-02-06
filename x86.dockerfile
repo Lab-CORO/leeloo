@@ -1,4 +1,4 @@
-FROM curobo_docker:rtx40xxx
+FROM curobo_ros:ampere-dev
 
 # Add camera azure kinect
 RUN apt update && apt install software-properties-common \
@@ -39,7 +39,8 @@ WORKDIR /home/ros2_ws/src
 # Add point cloud fusion
 RUN git clone -b humble-devel https://github.com/doosan-robotics/doosan-robot2.git && \
     git clone -b humble https://github.com/ros-controls/gz_ros2_control && \
-    git clone -b humble https://github.com/microsoft/Azure_Kinect_ROS_Driver.git 
+    git clone -b humble https://github.com/microsoft/Azure_Kinect_ROS_Driver.git &&\
+    git clone https://github.com/Lab-CORO/robotiq_85_gripper.git
 
 RUN sed -i '771d' /home/ros2_ws/src/Azure_Kinect_ROS_Driver/src/k4a_ros_device.cpp
 
@@ -52,9 +53,18 @@ RUN apt-get install -y ros-humble-gazebo-ros-pkgs ros-humble-moveit-msgs\
         ros-humble-control-msgs ros-humble-realtime-tools ros-humble-xacro\
         ros-humble-joint-state-publisher-gui ros-humble-ros2-control\
         ros-humble-ros2-controllers ros-humble-gazebo-msgs ros-humble-moveit-msgs\
-        dbus-x11 ros-humble-moveit-configs-utils ros-humble-moveit-ros-move-group libignition-gazebo6-dev ros-humble-image-proc
+        dbus-x11 ros-humble-moveit-configs-utils ros-humble-moveit-ros-move-group libignition-gazebo6-dev ros-humble-image-proc\
+        && pip3 install pyserial
 
 
 WORKDIR /home/ros2_ws
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
     colcon build"
+
+# Forcer la version MKL (optionnel mais recommandé pour la stabilité)
+RUN pip install mkl==2023.0.0 mkl-devel==2023.0.0 --force-reinstall --no-cache-dir
+
+# Créer les liens symboliques
+RUN cd /usr/local/lib && for lib in libmkl_*.so.2; do [ -f "$lib" ] && ln -sf "$lib" "$(basename "$lib" .so.2).so.1"; done
+
+
