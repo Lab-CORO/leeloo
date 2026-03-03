@@ -12,13 +12,14 @@ def generate_launch_description():
     # Package share paths
     dsr_bringup_share = get_package_share_directory('dsr_bringup2')
     kinect_driver_share = get_package_share_directory('azure_kinect_ros_driver')
+    curobo_share = get_package_share_directory('curobo_ros')
     fusion_share = get_package_share_directory('pointcloud_fusion')
 
     # Launch file paths
     dsr_launch_file = os.path.join(dsr_bringup_share, 'launch', 'dsr_bringup2_rviz.launch.py')
     kinect_launch_file = os.path.join(kinect_driver_share, 'launch', 'driver.launch.py')
     fusion_launch_file = os.path.join(fusion_share, 'launch', 'pointcloud_fusion.launch.py')
-
+    curobo_launch_file = os.path.join(curobo_share, 'launch', 'gen_traj.launch.py')
     return LaunchDescription([
         # Launch arguments for Doosan
         DeclareLaunchArgument('mode', default_value='real'),
@@ -26,6 +27,7 @@ def generate_launch_description():
         DeclareLaunchArgument('rt_host', default_value='192.168.50.50'),
         DeclareLaunchArgument('port', default_value='12345'),
         DeclareLaunchArgument('model', default_value='m1013'),
+        DeclareLaunchArgument('gui', default_value='False'),
 
 
         # Node(
@@ -53,6 +55,7 @@ def generate_launch_description():
                 'host': LaunchConfiguration('host'),
                 'port': LaunchConfiguration('port'),
                 'model': LaunchConfiguration('model'),
+                'gui': LaunchConfiguration('gui'),
             }.items()
         ),
 
@@ -67,9 +70,18 @@ def generate_launch_description():
         # ),
         # Node(
         #     package='curobo_ros',
-        #     executable='curobo_gen_traj',
+        #     executable='curobo_trajectory_planner',
         #     output='screen'
         # ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(curobo_launch_file)
+        # ),
+
+        Node(
+            package='leeloo',
+            executable='execute_trajectory',
+            output='screen'
+        ),
 
         # # Launch robot segmentation node directly
         # Node(
