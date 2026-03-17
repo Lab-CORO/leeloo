@@ -192,7 +192,7 @@ class PoseSaverNode(Node):
             case None: self.get_logger().error('[set_safety_mode] Pas de réponse.')
             case _:    self.get_logger().info(f'[set_safety_mode] Réponse : {resp}')
         self._go_ready()
-cd 
+ 
     def _go_ready(self):
         self._go(State.READY)
         self.get_logger().info(

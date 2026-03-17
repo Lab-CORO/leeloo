@@ -14,12 +14,14 @@ def generate_launch_description():
     kinect_driver_share = get_package_share_directory('azure_kinect_ros_driver')
     curobo_share = get_package_share_directory('curobo_ros')
     fusion_share = get_package_share_directory('pointcloud_fusion')
+    handeye_share = get_package_share_directory('hand_eye_calibration')
 
     # Launch file paths
     dsr_launch_file = os.path.join(dsr_bringup_share, 'launch', 'dsr_bringup2_rviz.launch.py')
     kinect_launch_file = os.path.join(kinect_driver_share, 'launch', 'driver.launch.py')
     fusion_launch_file = os.path.join(fusion_share, 'launch', 'pointcloud_fusion.launch.py')
     curobo_launch_file = os.path.join(curobo_share, 'launch', 'gen_traj.launch.py')
+    handeye_launch_file = os.path.join(handeye_share, 'calibration.launch.py')
     return LaunchDescription([
         # Launch arguments for Doosan
         DeclareLaunchArgument('mode', default_value='real'),
@@ -29,23 +31,6 @@ def generate_launch_description():
         DeclareLaunchArgument('model', default_value='m1013'),
         DeclareLaunchArgument('gui', default_value='False'),
 
-
-        # Node(
-        #     package='tf2_ros',
-        #     executable='static_transform_publisher',
-        #     name='static_transform_publisher_base_link_to_camera_base',
-        #     arguments=[
-        #         '-0.1290', # x
-        #         '-0.3955', # y 
-        #         '0.8821',  # z
-        #         '0.3666',   # yaw    (en radians)
-        #         '0.7854',   # pitch (en radians)
-        #         '0.2668',   # roll   (en radians)
-        #         'base_link', #frame_id
-        #         'camera_base' # child_frame_id
-        #     ],
-        #     output='log'
-        # ),
 
         # Include Doosan bringup launch file
         IncludeLaunchDescription(
@@ -64,36 +49,56 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(kinect_launch_file)
         ),
 
-        # Include Point Cloud Fusion launch file
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource(fusion_launch_file)
-        # ),
-        # Node(
-        #     package='curobo_ros',
-        #     executable='curobo_trajectory_planner',
-        #     output='screen'
-        # ),
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource(curobo_launch_file)
-        # ),
-
         Node(
             package='leeloo',
             executable='execute_trajectory',
             output='screen'
         ),
 
-        # # Launch robot segmentation node directly
-        # Node(
-        #     package='curobo_ros',
-        #     executable='robot_segmentation',
-        #     name='robot_segmentation',
-        #     output='screen',
-        #     parameters=[
-        #         {"joint_states_topic": "/dsr01/joint_states"},
-        #         {"point_cloud_topic": "/points2" },
-        #         {"robot_base_frame": "base_link" },
-        #         {"robot_config_file": "/home/ros2_ws/src/curobo_ros/curobo_doosan/src/m1013/m1013.yml" },
-        #         ]
-        # ),
+        # Détection du marqueur ArUco (fournit le frame TF 'marker')
+        Node(
+            package='ros2_markertracker',
+            executable='markertracker_node',
+            output='screen',
+            namespace='/ros2_markertracker',
+            parameters=[{
+                'input_image_topic': '/rgb/image_raw',
+                'publish_topic_image_result': True,
+                'camera_info_topic': '/rgb/camera_info',
+                'marker_length': 8.6,
+                'aruco_dictionary_id': 'DICT_APRILTAG_36H11',
+                'camera_frame_id': 'rgb_camera_link',
+                'marker_frame_id': 'marker',
+                'ignore_marker_ids_array': 17,
+            }]
+        ),
+
+        # Service de capture hand-eye (/hand_eye_calibration/capture_point)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(handeye_launch_file),
+            launch_arguments={
+                'calibration_type': 'eye-on-base',
+                'namespace_prefix': 'kinect_calib',
+                'freehand_robot_movement': 'true',
+                'robot_base_frame': 'base_link',
+                'robot_effector_frame': 'link_6',
+                'tracking_base_frame': 'rgb_camera_link',
+                'tracking_marker_frame': 'marker',
+            }.items()
+        ),
+
+        Node(
+            package='leeloo_calibration',
+            executable='kinect_tf_computation_node',
+            name='kinect_tf_computation_node',
+            output='screen',
+        ),
+
+        Node(
+            package='leeloo_calibration',
+            executable='auto_calibration_server',
+            name='auto_calibration_server',
+            output='screen',
+        ),
+
     ])

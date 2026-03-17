@@ -5,6 +5,7 @@ import yaml
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import TransformStamped
+from std_srvs.srv import Trigger
 import tf_transformations
 from tf2_ros import TransformBroadcaster, TransformListener, Buffer
 import ros2_numpy
@@ -25,7 +26,7 @@ class kinectTFComputationNode(Node):
         self.timer = self.create_timer(0.1, self.timer_callback)  # Exécution toutes les 0.1 secondes
  
         self.declare_parameter('calibration_result_file',
-            '/home/ros2_ws/src/tool_box/camera_calibration/config/kinect_hand_eye_result.yaml')
+            '/home/ros2_ws/src/leeloo_calibration/config/kinect_hand_eye_result.yaml')
 
         # Résultat de calibration hand-eye (tracking_base_frame=rgb_camera_link) :
         # = base_link → rgb_camera_link  (_base_T_rgb_)
@@ -51,7 +52,16 @@ class kinectTFComputationNode(Node):
         # self.base_link_to_rgb.transform.rotation.w = -0.3445
         self._load_calibration()
 
- 
+        self.create_service(Trigger, '~/reload_calibration', self._reload_calibration_cb)
+        self.get_logger().info('[INIT] Service ~/reload_calibration disponible.')
+
+    def _reload_calibration_cb(self, request, response):
+        """Recharge le fichier YAML de calibration à chaud."""
+        self._load_calibration()
+        response.success = True
+        response.message = 'Calibration rechargée.'
+        return response
+
     def _load_calibration(self):
         """Charge le transform de calibration depuis le fichier YAML."""
         filepath = self.get_parameter('calibration_result_file').value

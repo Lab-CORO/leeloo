@@ -23,7 +23,7 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
     xhost +local:docker
 
     # Exécutez le conteneur Docker avec les bonnes options
-    docker run --name leeloo_docker_calibration -it \
+    docker run --name leeloo_docker -it \
         --privileged \
         -e NVIDIA_DISABLE_REQUIRE=1 \
         -e NVIDIA_DRIVER_CAPABILITIES=all \
@@ -39,6 +39,8 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
         -v ./curobo_msgs:/home/ros2_ws/src/curobo_msgs\
         -v ./pointcloud_fusion:/home/ros2_ws/src/pointcloud_fusion\
         -v ./tool_box:/home/ros2_ws/src/tool_box \
+        -v ./ros2_handeye_calibration:/home/ros2_ws/src/ros2_handeye_calibration \
+        -v ./ros2_markertracker:/home/ros2_ws/src/ros2_markertracker \
         -v ./leeloo:/home/ros2_ws/src/leeloo \
         -v ./leeloo_calibration:/home/ros2_ws/src/leeloo_calibration \
         -v ./leeloo_msgs:/home/ros2_ws/src/leeloo_msgs \

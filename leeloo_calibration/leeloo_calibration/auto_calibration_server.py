@@ -25,6 +25,7 @@ from rclpy.action import ActionServer, ActionClient, GoalResponse, CancelRespons
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 
+from std_srvs.srv import Trigger
 from ros2_markertracker_interfaces.srv import CapturePoint
 from curobo_msgs.srv import TrajectoryGeneration, SetPlanner
 from curobo_msgs.action import SendTrajectory
@@ -46,7 +47,12 @@ class AutoCalibrationNode(Node):
         self.declare_parameter('set_planner_service',   '/unified_planner/set_planner')
         self.declare_parameter('calibration_poses_file', _DEFAULT_POSES_FILE)
         self.declare_parameter('calibration_result_file',
-            '/home/ros2_ws/src/tool_box/camera_calibration/config/kinect_hand_eye_result.yaml')
+            '/home/ros2_ws/src/leeloo_calibration/config/kinect_hand_eye_result.yaml')
+        self.declare_parameter('settle_time_s', 2.0)
+        self.declare_parameter('reload_calibration_service',
+            '/kinect_tf_computation_node/reload_calibration')
+        self.declare_parameter('reset_samples_service',
+            '/hand_eye_calibration/reset_samples')
 
         # ---- Callback group pour les clients ---------------------------------
         # ReentrantCallbackGroup requis : l'execute_callback de l'action server
@@ -70,6 +76,14 @@ class AutoCalibrationNode(Node):
         self._capture_client = self.create_client(
             CapturePoint,
             self.get_parameter('capture_point_service').value,
+            callback_group=self._clients_cb_group)
+        self._reload_client  = self.create_client(
+            Trigger,
+            self.get_parameter('reload_calibration_service').value,
+            callback_group=self._clients_cb_group)
+        self._reset_client   = self.create_client(
+            Trigger,
+            self.get_parameter('reset_samples_service').value,
             callback_group=self._clients_cb_group)
 
         # ---- Action server ---------------------------------------------------
@@ -142,6 +156,15 @@ class AutoCalibrationNode(Node):
                 return result
 
         self.get_logger().info('[action] Tous les serveurs sont prêts.')
+
+        # ---- 1b. Reset des samples hand-eye ---------------------------------
+        reset_resp = self._wait_future(
+            self._reset_client.call_async(Trigger.Request()),
+            timeout=5.0, goal_handle=goal_handle)
+        if reset_resp is not None and reset_resp.success:
+            self.get_logger().info(f'[action] Samples réinitialisés : {reset_resp.message}')
+        else:
+            self.get_logger().warn('[action] Reset samples sans réponse valide. On continue.')
 
         # ---- 2. Chargement des poses -----------------------------------------
         poses_file = self.get_parameter('calibration_poses_file').value
@@ -244,6 +267,18 @@ class AutoCalibrationNode(Node):
                 continue
             self.get_logger().info('  [execute] Trajectoire exécutée avec succès.')
 
+            # -- Stabilisation du robot avant capture --------------------------
+            settle = self.get_parameter('settle_time_s').value
+            self.get_logger().info(f'  [settle] Attente stabilisation {settle:.1f}s...')
+            if not self._sleep_or_cancel(settle, goal_handle):
+                result.success         = False
+                result.poses_completed = completed
+                result.poses_failed    = failed
+                result.message         = f'Annulé pendant stabilisation à la pose {i + 1}.'
+                goal_handle.canceled()
+                self._running = False
+                return result
+
             # -- Capture -------------------------------------------------------
             _fb('Capturing')
             cap_resp = self._wait_future(
@@ -280,10 +315,23 @@ class AutoCalibrationNode(Node):
             f'=== Calibration terminée : {completed}/{total} OK'
             + (f', {failed} échouées.' if failed else ' — aucune erreur.') + ' ===')
 
-        # ---- 5b. Sauvegarde du résultat de calibration ----------------------
+        # ---- 5b. Sauvegarde du résultat et rechargement TF ------------------
         if last_calibration_transform is not None:
             result_file = self.get_parameter('calibration_result_file').value
             self._save_calibration_yaml(last_calibration_transform, result_file)
+            if self._reload_client.service_is_ready():
+                reload_resp = self._wait_future(
+                    self._reload_client.call_async(Trigger.Request()), timeout=5.0)
+                if reload_resp is not None and reload_resp.success:
+                    self.get_logger().info(
+                        '[calibration] kinect_tf_computation_node rechargé avec la nouvelle calibration.')
+                else:
+                    self.get_logger().warn(
+                        '[calibration] Échec du rechargement kinect_tf_computation_node.')
+            else:
+                self.get_logger().warn(
+                    '[calibration] Service reload_calibration non disponible — '
+                    'redémarre kinect_tf_computation_node pour appliquer la nouvelle calibration.')
         else:
             self.get_logger().warn(
                 '[calibration] Pas assez de samples pour calculer un résultat (minimum 4).')
@@ -295,6 +343,8 @@ class AutoCalibrationNode(Node):
             f'Calibration terminée : {completed}/{total} OK'
             + (f', {failed} échouées.' if failed else '.')
         )
+        if last_calibration_transform is not None:
+            result.transform = last_calibration_transform
         goal_handle.succeed()
         self._running = False
         return result
@@ -310,6 +360,7 @@ class AutoCalibrationNode(Node):
                 (self._gen_client,     'generate_trajectory'),
                 (self._planner_client, 'set_planner'),
                 (self._capture_client, 'capture_point'),
+                (self._reset_client,   'reset_samples'),
             ]
             if not client.service_is_ready()
         ]

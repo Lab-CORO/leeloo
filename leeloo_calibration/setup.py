@@ -22,9 +22,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'auto_calibration_server = '
-            'leeloo_calibration.auto_calibration_server:main',
-            'auto_calibration_server_v2 = leeloo_calibration.auto_calibration_server_v2:main',
+            'auto_calibration_server = leeloo_calibration.auto_calibration_server:main',
+            'kinect_tf_computation_node = leeloo_calibration.kinect_tf_computation_node:main',
             'pose_saver_node = leeloo_calibration.pose_saver_node:main',
         ],
     },

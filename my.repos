@@ -19,3 +19,11 @@ repositories:
     type: git
     url: https://github.com/Lab-CORO/pointcloud_fusion.git
     version: main
+  ros2_handeye_calibration:
+    type: git
+    url: https://github.com/Lab-CORO/ros2_handeye_calibration.git
+    version: main
+  ros2_markertracker:
+    type: git
+    url: https://github.com/Lab-CORO/ros2_markertracker.git
+    version: main

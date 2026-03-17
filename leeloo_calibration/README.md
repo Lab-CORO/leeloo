@@ -1,49 +1,51 @@
-# leeloo_calibration & leeloo_msgs
+# leeloo_calibration
 
-Packages ROS 2 pour la **calibration main-oeil automatisée** du robot Leeloo.  
-La procédure déplace le robot sur 15 poses prédéfinies via [curobo_ros](https://github.com/Lab-CORO/curobo_ros) et capture un échantillon de calibration à chaque arrêt via [ros2_handeye_calibration](https://github.com/giuschio/ros2_handeye_calibration).
-
----
-
-## Packages
-
-| Package | Rôle |
-|---|---|
-| `leeloo_msgs` | Définition de l'action `RunCalibration` |
-| `leeloo_calibration` | Noeud serveur qui expose et exécute l'action |
+ROS 2 package for **automated hand-eye calibration** of the Leeloo robot.
+The procedure moves the robot through a set of predefined poses using [curobo_ros](https://github.com/Lab-CORO/curobo_ros), captures a calibration sample at each stop via [ros2_handeye_calibration](https://github.com/Lab-CORO/ros2_handeye_calibration), and publishes the resulting camera TF.
 
 ---
 
-## Prérequis
+## Nodes
 
-Ces packages s'exécutent dans le **Docker `LEELOO_DOCKER_CALIBRATION`** et dépendent des packages déjà présents dans `src/` :
-
-| Dépendance | Rôle |
+| Node | Role |
 |---|---|
-| `curobo_ros` | Planification et exécution de trajectoires (GPU) |
-| `curobo_msgs` | Interfaces `TrajectoryGeneration` + `SendTrajectory` |
-| `ros2_handeye_calibration` | Noeud de calibration, expose `/hand_eye_calibration/capture_point` |
-| `std_srvs` | `Trigger` (service de capture) |
-| `sensor_msgs` | `JointState` (format de trajectoire) |
+| `auto_calibration_server` | Action server that drives the full calibration procedure |
+| `kinect_tf_computation_node` | Reads the calibration result and publishes the `base_link → camera_base` TF |
+| `pose_saver_node` | Helper to record calibration poses manually in teach-and-repeat mode |
+
+The action interface is defined in [`leeloo_msgs`](../leeloo_msgs/).
+
+---
+
+## Dependencies
+
+| Package | Role |
+|---|---|
+| `curobo_ros` | Trajectory planning and execution (GPU) |
+| `curobo_msgs` | `TrajectoryGeneration` + `SendTrajectory` interfaces |
+| `ros2_handeye_calibration` | Hand-eye service (`/hand_eye_calibration/capture_point`) |
+| `ros2_markertracker` | ArUco/AprilTag marker detection (provides the `marker` TF frame) |
+| `ros2_markertracker_interfaces` | `CapturePoint` service definition |
+| `azure_kinect_ros_driver` | Kinect camera driver |
 
 ---
 
 ## Installation
 
 ```bash
-# Depuis la racine du workspace dans le docker
+# From the workspace root inside the docker
 cd /home/ros2_ws
 
-# 1. Builder leeloo_msgs en premier (leeloo_calibration en dépend)
+# Build leeloo_msgs first (leeloo_calibration depends on it)
 colcon build --packages-select leeloo_msgs
 source install/setup.bash
 
-# 2. Builder leeloo_calibration
+# Build leeloo_calibration
 colcon build --packages-select leeloo_calibration
 source install/setup.bash
 ```
 
-> **Ou en une seule commande** (colcon résout l'ordre automatiquement) :
+> **Or in one command** (colcon resolves the order automatically):
 > ```bash
 > colcon build --packages-select leeloo_msgs leeloo_calibration
 > source install/setup.bash
@@ -51,240 +53,201 @@ source install/setup.bash
 
 ---
 
-## Utilisation
+## Usage
 
-### 1. Lancer les noeuds requis
+### Option A — Full automated calibration
 
-Avant de démarrer `leeloo_calibration`, les noeuds suivants doivent être actifs :
-
-```bash
-# Terminal 1 — curobo_ros (planification + exécution)
-ros2 launch curobo_ros gen_traj.launch.py \
-    robot_config_file:=/home/ros2_ws/src/curobo_ros/curobo_doosan/src/m1013/m1013.yml
-
-# Terminal 2 — hand-eye calibration (capture des échantillons)
-ros2 launch hand_eye_calibration calibration.launch.py \
-    tracking_base_frame:=<camera_frame> \
-    tracking_marker_frame:=<marker_frame> \
-    robot_base_frame:=base_link \
-    robot_effector_frame:=tool0
-```
-
-### 2. Lancer le serveur de calibration
+Launch all required nodes with the bringup file:
 
 ```bash
-# Terminal 3
-ros2 run leeloo_calibration auto_calibration_server
+ros2 launch leeloo bringup_leeloo.launch.py
 ```
 
-Sortie attendue :
-```
-[INFO] AutoCalibrationServer démarré.
-  → ros2 action send_goal /leeloo_calibration/run ...
-```
+This starts the Doosan robot, the Kinect driver, the ArUco tracker, the hand-eye calibration service, and the two calibration nodes (`kinect_tf_computation_node` + `auto_calibration_server`).
 
-### 3. Déclencher la procédure
+Then trigger the calibration procedure:
 
 ```bash
-# Terminal 4 — lance la calibration complète sur 15 poses
-ros2 action send_goal /leeloo_calibration/run \
+ros2 action send_goal /run_calibration \
     leeloo_msgs/action/RunCalibration \
-    "{num_poses: 15, wait_between_poses_s: 2.0}" \
+    "{num_poses: 0, wait_between_poses_s: 2.0}" \
     --feedback
 ```
 
-Exemple de feedback reçu :
+`num_poses: 0` means all poses defined in `config/calibration_poses.yaml`.
+
+Expected feedback:
 ```
 Feedback:
   current_pose: 3
   total_poses: 15
-  status: Executing trajectory
-  percent_complete: 19.8
-
-Feedback:
-  current_pose: 3
-  total_poses: 15
-  status: Capturing calibration sample
+  status: Capturing
   percent_complete: 23.1
 ...
 Result:
   success: True
   poses_completed: 15
   poses_failed: 0
-  message: 15/15 poses réussies.
+  message: "Calibration terminée : 15/15 OK."
 ```
 
-### 4. Annuler en cours de route
+The calibration result is saved to `config/kinect_hand_eye_result.yaml` and `kinect_tf_computation_node` is reloaded automatically.
+
+---
+
+### Option B — Record poses manually (`pose_saver_node`)
+
+Use this node to teach calibration poses by moving the robot by hand:
 
 ```bash
-ros2 action cancel_goal /leeloo_calibration/run <goal_id>
+ros2 run leeloo_calibration pose_saver_node
+```
+
+The robot is automatically switched to manual mode (teach pendant). To save the current joint position:
+
+```bash
+ros2 service call /save_pose std_srvs/srv/Trigger {}
+```
+
+Poses are appended to `config/calibration_poses.yaml` in real time.
+Run the automated calibration (Option A) after recording enough poses (minimum 4, recommended 15+).
+
+---
+
+### Cancel a running calibration
+
+```bash
+ros2 action cancel_goal /run_calibration <goal_id>
 ```
 
 ---
 
-## Interface de l'action
+## Action Interface
 
 ### `leeloo_msgs/action/RunCalibration`
 
-**Goal** (entrée) :
+**Goal** (input):
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |---|---|---|
-| `num_poses` | `int32` | Nombre de poses à exécuter. `0` = toutes (15) |
-| `wait_between_poses_s` | `float64` | Délai en secondes entre chaque capture. Défaut : `2.0` |
+| `num_poses` | `int32` | Number of poses to execute. `0` = all poses in the YAML file |
+| `wait_between_poses_s` | `float64` | Delay in seconds between captures. Default: `5.0` |
 
-**Feedback** (progression) :
+**Feedback** (progress):
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |---|---|---|
-| `current_pose` | `int32` | Numéro de la pose en cours |
-| `total_poses` | `int32` | Nombre total de poses |
-| `status` | `string` | Étape en cours (`Generating`, `Executing`, `Capturing`, `Done`) |
-| `percent_complete` | `float32` | Avancement global en % |
+| `current_pose` | `int32` | Current pose index |
+| `total_poses` | `int32` | Total number of poses |
+| `status` | `string` | Current step (`Waiting`, `Generating`, `Executing`, `Capturing`, `Done`) |
+| `percent_complete` | `float32` | Overall progress (%) |
 
-**Result** (résultat final) :
+**Result**:
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |---|---|---|
-| `success` | `bool` | `true` si aucune pose n'a échoué |
-| `poses_completed` | `int32` | Nombre de poses réussies |
-| `poses_failed` | `int32` | Nombre de poses échouées (skipped) |
-| `message` | `string` | Résumé lisible |
+| `success` | `bool` | `true` if no pose failed |
+| `poses_completed` | `int32` | Number of successful poses |
+| `poses_failed` | `int32` | Number of skipped poses |
+| `message` | `string` | Human-readable summary |
+| `transform` | `geometry_msgs/Transform` | Final calibration transform (`base_link → rgb_camera_link`) |
 
 ---
 
-## Paramètres ROS du noeud
+## Node Parameters
 
-Les noms de services/actions peuvent être remappés via des paramètres :
+### `auto_calibration_server`
 
-| Paramètre | Défaut | Description |
+| Parameter | Default | Description |
 |---|---|---|
-| `capture_point_service` | `/hand_eye_calibration/capture_point` | Service de capture des échantillons |
-| `traj_generate_service` | `/unified_planner/generate_trajectory` | Service de planification curobo |
-| `traj_execute_action` | `/unified_planner/execute_trajectory` | Action d'exécution curobo |
+| `capture_point_service` | `/hand_eye_calibration/capture_point` | Sample capture service |
+| `traj_generate_service` | `/unified_planner/generate_trajectory` | Trajectory planning service |
+| `traj_execute_action` | `/unified_planner/execute_trajectory` | Trajectory execution action |
+| `set_planner_service` | `/unified_planner/set_planner` | Planner type selection service |
+| `calibration_poses_file` | `.../config/calibration_poses.yaml` | Poses YAML file |
+| `calibration_result_file` | `.../config/kinect_hand_eye_result.yaml` | Output calibration file |
+| `settle_time_s` | `2.0` | Robot settle time before each capture (seconds) |
+| `reload_calibration_service` | `/kinect_tf_computation_node/reload_calibration` | Hot-reload service for TF node |
+| `reset_samples_service` | `/hand_eye_calibration/reset_samples` | Reset previous samples before a new run |
 
-Exemple avec remappages :
-```bash
-ros2 run leeloo_calibration auto_calibration_server \
-    --ros-args \
-    -p capture_point_service:=/my_calib/capture \
-    -p traj_execute_action:=/unified_planner/execute_trajectory
+### `kinect_tf_computation_node`
+
+| Parameter | Default | Description |
+|---|---|---|
+| `calibration_result_file` | `.../config/kinect_hand_eye_result.yaml` | YAML file produced by `auto_calibration_server` |
+
+Exposes service `~/reload_calibration` (`std_srvs/Trigger`) to hot-reload the calibration file without restarting.
+
+### `pose_saver_node`
+
+| Parameter | Default | Description |
+|---|---|---|
+| `robot_mode_service` | `/dsr01/system/set_robot_mode` | DSR robot mode service |
+| `safety_mode_service` | `/dsr01/system/set_safety_mode` | DSR safety mode service |
+| `joint_states_topic` | `/dsr01/joint_states` | Joint states topic |
+| `output_file` | `.../config/calibration_poses.yaml` | Output poses file |
+
+---
+
+## Internal Architecture
+
 ```
-
----
-
-## Poses de calibration
-
-Les 15 poses sont définies statiquement dans `auto_calibration_server.py` dans la constante `CALIBRATION_POSES`, organisées en 3 rangées :
-
-| Rangée | z (m) | Nb de poses |
-|---|---|---|
-| Haute | 0.60 | 5 |
-| Médiane | 0.45 | 5 |
-| Basse | 0.30 | 5 |
-
-> ⚠️ **Ces poses sont à adapter** selon le workspace réel de votre robot.  
-> Modifier la liste `CALIBRATION_POSES` dans `leeloo_calibration/auto_calibration_server.py`.  
-> Format de chaque entrée : `(x, y, z, qx, qy, qz, qw)`
-
----
-
-## Architecture interne
-
-```
-Client (CLI / autre noeud)
+Client (CLI / other node)
         │  Goal: {num_poses, wait_s}
         ▼
-┌─────────────────────────────────────────────────┐
-│          AutoCalibrationServer                   │
-│          /leeloo_calibration/run                 │
-│                                                  │
-│  Pour chaque pose :                              │
-│                                                  │
-│  1. generate_trajectory ──► curobo_ros           │
-│     (Service)               retourne             │
-│                             JointState[] + dt    │
-│                                                  │
-│  2. execute_trajectory ───► curobo_ros           │
-│     (Action)                goal: JointState[]   │
-│                             + dt                 │
-│                             feedback:            │
-│                             step_progression     │
-│                                                  │
-│  3. capture_point ────────► hand_eye_calibration │
-│     (Service Trigger)       enregistre TF sample │
-│                                                  │
-│  ◄── Feedback à chaque étape                     │
-└─────────────────────────────────────────────────┘
-        │  Result: {success, completed, failed}
+┌──────────────────────────────────────────────┐
+│          AutoCalibrationServer               │
+│          /run_calibration                    │
+│                                              │
+│  For each pose:                              │
+│                                              │
+│  1. generate_trajectory ──► curobo_ros       │
+│     (Service)               returns          │
+│                             JointState[] + dt│
+│                                              │
+│  2. execute_trajectory ───► curobo_ros       │
+│     (Action)                goal: trajectory │
+│                                              │
+│  3. capture_point ────────► hand_eye_calib   │
+│     (CapturePoint service)  records TF sample│
+│                                              │
+│  ◄── Feedback at each step                   │
+└──────────────────────────────────────────────┘
+        │  Result: {success, transform, ...}
         ▼
      Client
-```
 
-### Services et actions utilisés
-
-| Interface | Type | Nom ROS | Package |
-|---|---|---|---|
-| Génération trajectoire | Service | `/unified_planner/generate_trajectory` | `curobo_msgs/srv/TrajectoryGeneration` |
-| Exécution trajectoire | Action | `/unified_planner/execute_trajectory` | `curobo_msgs/action/SendTrajectory` |
-| Capture calibration | Service | `/hand_eye_calibration/capture_point` | `std_srvs/srv/Trigger` |
-
-### Interfaces curobo_msgs utilisées
-
-**`TrajectoryGeneration.srv`** (goal → trajectoire planifiée) :
-```
-# Request
-geometry_msgs/Pose target_pose
----
-# Response
-bool success
-string message
-sensor_msgs/JointState[] trajectory
-float64 dt
-```
-
-**`SendTrajectory.action`** (exécution sur le robot) :
-```
-# Goal
-sensor_msgs/JointState[] trajectory
-float64 dt
----
-# Result
-bool success
-string message
----
-# Feedback
-sensor_msgs/JointState joint_command
-float32 step_progression
+After calibration:
+  auto_calibration_server ──saves──► kinect_hand_eye_result.yaml
+                          ──calls──► kinect_tf_computation_node/reload_calibration
+                                            │
+                                            ▼
+                              publishes TF: world → camera_base
 ```
 
 ---
 
-## Structure des fichiers
+## File Structure
 
 ```
-src/
-├── leeloo_msgs/
-│   ├── action/
-│   │   └── RunCalibration.action
-│   ├── CMakeLists.txt
-│   └── package.xml
-│
-└── leeloo_calibration/
-    ├── leeloo_calibration/
-    │   ├── __init__.py
-    │   └── auto_calibration_server.py
-    ├── resource/
-    │   └── leeloo_calibration
-    ├── package.xml
-    └── setup.py
+leeloo_calibration/
+├── config/
+│   ├── calibration_poses.yaml        # Joint poses for calibration
+│   └── kinect_hand_eye_result.yaml   # Output: calibration result (generated)
+├── leeloo_calibration/
+│   ├── __init__.py
+│   ├── auto_calibration_server.py    # Calibration action server
+│   ├── kinect_tf_computation_node.py # TF publisher from calibration result
+│   └── pose_saver_node.py            # Manual pose recording helper
+├── package.xml
+└── setup.py
 ```
 
 ---
 
-## Packages liés
+## Related Packages
 
-- [`curobo_ros`](https://github.com/Lab-CORO/curobo_ros) — Planification GPU avec cuRobo
-- [`curobo_msgs`](https://github.com/Lab-CORO/curobo_msgs) — Interfaces ROS 2 de curobo_ros
-- [`ros2_handeye_calibration`](https://github.com/giuschio/ros2_handeye_calibration) — Calibration main-oeil Tsai-Lenz
-- [`tool_box`](https://github.com/Lab-CORO/tool_box) — Dépôt parent de ce package
+- [`curobo_ros`](https://github.com/Lab-CORO/curobo_ros) — GPU trajectory planning with cuRobo
+- [`curobo_msgs`](https://github.com/Lab-CORO/curobo_msgs) — ROS 2 interfaces for curobo_ros
+- [`ros2_handeye_calibration`](https://github.com/Lab-CORO/ros2_handeye_calibration) — Tsai-Lenz hand-eye calibration
+- [`ros2_markertracker`](https://github.com/Lab-CORO/ros2_markertracker) — ArUco/AprilTag marker detection
