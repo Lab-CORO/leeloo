@@ -22,7 +22,7 @@ repositories:
   ros2_handeye_calibration:
     type: git
     url: https://github.com/Lab-CORO/ros2_handeye_calibration.git
-    version: main
+    version: HandEyeCalibUpdates
   ros2_markertracker:
     type: git
     url: https://github.com/Lab-CORO/ros2_markertracker.git

@@ -41,15 +41,7 @@ class kinectTFComputationNode(Node):
         self.base_link_to_rgb = TransformStamped()
         self.base_link_to_rgb.header.frame_id = 'base_link'
         self.base_link_to_rgb.child_frame_id = 'rgb_camera_link'
-        # Dernière calibration connue (fallback si le fichier YAML est absent) :
-        # tx, ty, tz, qx, qy, qz, qw: [0.0102, -0.4989, 0.8822, 0.7512, -0.5223, 0.2103, -0.3445]
-        # self.base_link_to_rgb.transform.translation.x = 0.0102
-        # self.base_link_to_rgb.transform.translation.y = -0.4989
-        # self.base_link_to_rgb.transform.translation.z =  0.8822
-        # self.base_link_to_rgb.transform.rotation.x =  0.7512
-        # self.base_link_to_rgb.transform.rotation.y = -0.5223
-        # self.base_link_to_rgb.transform.rotation.z =  0.2103
-        # self.base_link_to_rgb.transform.rotation.w = -0.3445
+  
         self._load_calibration()
 
         self.create_service(Trigger, '~/reload_calibration', self._reload_calibration_cb)
