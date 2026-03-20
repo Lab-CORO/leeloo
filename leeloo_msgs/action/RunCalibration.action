@@ -1,0 +1,25 @@
+# ================================================================
+# leeloo_msgs/action/RunCalibration.action
+#
+# Action exposée par leeloo_calibration pour lancer la procédure
+# complète de calibration main-oeil sur N poses via curobo_ros.
+# ================================================================
+
+# --- GOAL ---
+int32  num_poses              # Nb de poses à exécuter (0 = toutes)
+float64 wait_between_poses_s  # Délai (s) entre chaque capture (défaut: 2.0)
+
+---
+# --- RESULT ---
+bool   success
+int32  poses_completed
+int32  poses_failed
+string message
+geometry_msgs/Transform transform
+
+---
+# --- FEEDBACK ---
+int32  current_pose
+int32  total_poses
+string status           # "Generating" | "Executing" | "Capturing" | "Done"
+float32 percent_complete

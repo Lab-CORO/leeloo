@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>leeloo_calibration</name>
+  <version>0.1.0</version>
+  <description>
+    Noeud ROS 2 de calibration automatique main-oeil pour le robot Leeloo.
+    Expose l'action /leeloo_calibration/run qui orchestre curobo_ros
+    et hand_eye_calibration pour 15 poses.
+  </description>
+
+  <maintainer email="todo@lab-coro.ca">Lab-CORO</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>leeloo_msgs</depend>
+  <depend>curobo_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>builtin_interfaces</depend>
+  <depend>dsr_msgs2</depend>
+
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

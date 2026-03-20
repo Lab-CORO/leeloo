@@ -39,7 +39,11 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
         -v ./curobo_msgs:/home/ros2_ws/src/curobo_msgs\
         -v ./pointcloud_fusion:/home/ros2_ws/src/pointcloud_fusion\
         -v ./tool_box:/home/ros2_ws/src/tool_box \
+        -v ./ros2_handeye_calibration:/home/ros2_ws/src/ros2_handeye_calibration \
+        -v ./ros2_markertracker:/home/ros2_ws/src/ros2_markertracker \
         -v ./leeloo:/home/ros2_ws/src/leeloo \
+        -v ./leeloo_calibration:/home/ros2_ws/src/leeloo_calibration \
+        -v ./leeloo_msgs:/home/ros2_ws/src/leeloo_msgs \
         --cap-add=sys_nice \
         --ulimit rtprio=99 \
         --ulimit memlock=-1 \
