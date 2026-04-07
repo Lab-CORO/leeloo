@@ -24,42 +24,46 @@ class PrismDetectorNode(Node):
         self.filtered_scan_pub = self.create_publisher(LaserScan, '/filtered_scan', 10)
 
         # ── Detection parameters ─────────────────────────────────────────────
-        # 160° removed: too often confused with 110° and unreliably detected
+        # Characteristic angles of the usable prism corners
         self.target_angles = {110.0, 135.0}
         self.angle_tolerance = 8.0
         self.poly_epsilon = 0.015
 
-        # Search zone: forward half-space only, within a reasonable range
-        self.max_range = 3.0          # m — beyond this it is not the tool
-        self.min_range = 0.1          # m
+        # Search zone: only in front of the robot and at a reasonable range
+        self.max_range = 3.0          # meters — beyond this, it's not the tool
+        self.min_range = 0.1          # meters
         self.fov_half_deg = 90.0      # ±90° around the forward axis (angle=0)
 
-        # Apex distance constraint (tool is ~70 cm away)
-        self.min_corner_dist = 0.20   # m — tool cannot overlap the robot
-        self.max_corner_dist = 2.0    # m — beyond this it is the environment
+        # Constraint on the detected apex position (corner apex)
+        # The tool is ~70 cm away → the apex must be at a reasonable distance
+        self.min_corner_dist = 0.20   # m — the tool cannot be on the robot
+        self.max_corner_dist = 2.0    # m — beyond this it's the environment
 
-        # Corner quality: arm length and balance
-        self.min_arm_length = 0.04    # m — each arm must be ≥ 4 cm
-        self.max_arm_length = 0.10    # m — tool is small, not a wall
+        # Corner quality
+        self.min_arm_length = 0.04    # each arm must be ≥ 4 cm
+        self.max_arm_length = 0.10    # and ≤ 10 cm (the tool is small, not a wall)
+        # The two arms must be balanced (length ratio)
         self.max_arm_ratio = 4.0      # long_arm / short_arm ≤ 4
 
-        # Gap threshold: stop arm collection when consecutive points exceed this
-        self.cluster_gap_threshold = 0.009  # m
+        # Cluster cut threshold: if two consecutive points (in angular order)
+        # are separated by more than this distance, stop the arm there.
+        self.cluster_gap_threshold = 0.009  # meters
 
         # ── Temporal filter ──────────────────────────────────────────────────
-        # Accept a detection only if consistent with the N previous frames.
-        # Published pose is the sliding average of the last K accepted detections.
-        self.history_size = 5                    # frames in the sliding average
-        self.max_jump = 0.25                     # max position jump between frames (m)
-        self.max_yaw_jump = math.radians(30.0)  # max yaw jump — rejects outliers
-        self.min_consecutive = 3                 # consecutive hits before publishing
+        # A detection is only accepted if it is consistent with the N previous frames
+        # (distance between positions < max_jump).
+        # The published pose is the sliding average of the K last detections.
+        self.history_size = 5                    # number of frames for the average
+        self.max_jump = 0.25                     # max position jump between two detections (m)
+        self.max_yaw_jump = math.radians(30.0)  # max orientation jump — rejects outliers
+        self.min_consecutive = 3                 # consecutive detections before publishing
 
         self._pose_history = deque(maxlen=self.history_size)
         self._consecutive_detections = 0
 
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
 
-        self.get_logger().info("Prism detector démarré — publication sur /prism_detection")
+        self.get_logger().info("Prism detector started — publishing on /prism_detection")
 
     # ── Main callback ────────────────────────────────────────────────────────
 
@@ -117,7 +121,7 @@ class PrismDetectorNode(Node):
             for i in range(1, len(vertices) - 1):
                 p_prev, p_curr, p_next = vertices[i - 1], vertices[i], vertices[i + 1]
 
-                # 3a. Apex distance to lidar constraint
+                # 3a. Constraint on the apex distance to the lidar
                 corner_dist = np.linalg.norm(p_curr)
                 if not (self.min_corner_dist <= corner_dist <= self.max_corner_dist):
                     continue
@@ -125,7 +129,7 @@ class PrismDetectorNode(Node):
                 arm1 = np.linalg.norm(p_prev - p_curr)
                 arm2 = np.linalg.norm(p_next - p_curr)
 
-                # 3b. Arm length constraint
+                # 3b. Constraint on arm length
                 if not (self.min_arm_length <= arm1 <= self.max_arm_length):
                     continue
                 if not (self.min_arm_length <= arm2 <= self.max_arm_length):
@@ -144,7 +148,7 @@ class PrismDetectorNode(Node):
                 for target_angle in self.target_angles:
                     deviation = abs(angle_deg - target_angle)
                     if deviation <= self.angle_tolerance:
-                        # Score : meilleure correspondance angulaire = score plus haut
+                        # Score: better angular match = higher score
                         score = self.angle_tolerance - deviation
                         if best_corner is None or score > best_corner[4]:
                             best_corner = (p_prev, p_curr, p_next, target_angle, score, cluster_mask)
@@ -180,7 +184,7 @@ class PrismDetectorNode(Node):
     def _register_detection(self, raw_detection):
         px = raw_detection.pose.position.x
         py = raw_detection.pose.position.y
-        # Extract yaw from 2D quaternion (only z and w are non-zero)
+        # Extract yaw from the 2D quaternion (only z and w are non-zero)
         raw_yaw = 2.0 * math.atan2(
             raw_detection.pose.orientation.z,
             raw_detection.pose.orientation.w,
@@ -197,14 +201,14 @@ class PrismDetectorNode(Node):
             ))
 
             if pos_jump > self.max_jump:
-                # Position jump: reset history and accept the new position
+                # Position jump: reset and accept the new position
                 self._pose_history.clear()
                 self._consecutive_detections = 0
             elif yaw_jump > self.max_yaw_jump:
-                # Aberrant yaw: reject the frame without polluting the history
+                # Outlier yaw: reject the frame, do not pollute the history
                 self._consecutive_detections = 0
                 self.get_logger().debug(
-                    f"Yaw rejeté : brut={math.degrees(raw_yaw):.1f}° "
+                    f"Rejected yaw: raw={math.degrees(raw_yaw):.1f}° "
                     f"delta={math.degrees(yaw_jump):.1f}°"
                 )
                 return
@@ -241,25 +245,25 @@ class PrismDetectorNode(Node):
             self.tf_broadcaster.sendTransform(t)
 
             self.get_logger().debug(
-                f"coin={smoothed.detected_corner}° "
+                f"corner={smoothed.detected_corner}° "
                 f"x={smoothed.pose.position.x:.3f} y={smoothed.pose.position.y:.3f} "
-                f"yaw_brut={math.degrees(raw_yaw):.1f}° "
-                f"yaw_lisse={math.degrees(smoothed_yaw):.1f}° "
+                f"raw_yaw={math.degrees(raw_yaw):.1f}° "
+                f"smooth_yaw={math.degrees(smoothed_yaw):.1f}° "
                 f"history={len(self._pose_history)}"
             )
 
     def _register_no_detection(self):
         self._consecutive_detections = 0
 
-    # ── Pose computation from corner ────────────────────────────────────────
+    # ── Pose computation from corner ─────────────────────────────────────────
 
     def compute_detection(self, apex_xy, bisector_away, angle_type, header):
-        """Build a PrismDetection from the stable apex and bisector.
+        """Build a PrismDetection from the stable apex and the bisector.
 
         Args:
-            apex_xy:       np.ndarray (2,) — apex XY position.
-            bisector_away: np.ndarray (2,) — unit vector of the bisector pointing
-                           into the opening of the V (toward the interior of the corner).
+            apex_xy:       np.ndarray (2,) — XY position of the apex.
+            bisector_away: np.ndarray (2,) — unit vector of the bisector
+                           pointing into the V opening (toward the interior of the corner).
             angle_type:    float — corner angle in degrees (110. or 135.).
             header:        std_msgs/Header of the source scan.
         """
@@ -298,7 +302,8 @@ class PrismDetectorNode(Node):
     def _line_intersection(c1, d1, c2, d2):
         """Intersection of two parametric lines (point + direction).
 
-        Solves c1 + t*d1 = c2 + s*d2 for t. Returns the point or None if parallel.
+        Solves c1 + t*d1 = c2 + s*d2 for t, returns the point or None
+        if the lines are parallel.
         """
         A = np.array([[d1[0], -d2[0]], [d1[1], -d2[1]]])
         if abs(np.linalg.det(A)) < 1e-8:
@@ -307,20 +312,20 @@ class PrismDetectorNode(Node):
         return c1 + t * d1
 
     def _fit_stable_corner(self, cluster_scan_indices, ranges, angles, rough_apex):
-        """Refine the apex and bisector by line fitting on each arm.
+        """Refine the apex and bisector by fitting lines to the arms.
 
         Algorithm:
-          1. Sort cluster indices in scan angular order.
+          1. Sort cluster indices in the angular order of the scan.
           2. Find the point closest to rough_apex → apex position.
-          3. Collect each arm (left / right in angular order), stopping at the
-             first gap > cluster_gap_threshold.
+          3. Collect each arm (left / right in angular order), stopping
+             at the first gap > cluster_gap_threshold.
           4. Fit a line (SVD) on each arm.
-          5. Compute the intersection of both lines → stable apex.
-          6. Build the bisector from the directions toward each arm centroid.
+          5. Compute the intersection of the two lines → stable apex.
+          6. Build the bisector from the directions of the two lines.
 
         Returns:
-            (stable_apex, bisector_away, kept_indices) on success,
-            (None, None, kept_indices) on failure (caller falls back to rough_apex).
+            (stable_apex, bisector_away, kept_indices) if the fit succeeds,
+            (None, None, kept_indices) otherwise (caller uses rough_apex as fallback).
         """
         if len(cluster_scan_indices) == 0:
             return None, None, []
@@ -334,14 +339,14 @@ class PrismDetectorNode(Node):
         # Point closest to the approxPolyDP apex
         apex_pos = int(np.argmin(np.hypot(xs - rough_apex[0], ys - rough_apex[1])))
 
-        # Right arm (increasing angle) — stop at first large gap
+        # Right arm (increasing angle) — stop at the first large gap
         right_pos = []
         for i in range(apex_pos + 1, len(sorted_scan_idx)):
             if math.hypot(xs[i] - xs[i - 1], ys[i] - ys[i - 1]) > self.cluster_gap_threshold:
                 break
             right_pos.append(i)
 
-        # Left arm (decreasing angle) — stop at first large gap
+        # Left arm (decreasing angle) — stop at the first large gap
         left_pos = []
         for i in range(apex_pos - 1, -1, -1):
             if math.hypot(xs[i] - xs[i + 1], ys[i] - ys[i + 1]) > self.cluster_gap_threshold:
@@ -370,9 +375,10 @@ class PrismDetectorNode(Node):
         if stable_apex is None:
             return None, None, kept
 
-        # Bisector: vector from apex toward each arm centroid (apex excluded).
-        # SVD eigenvectors have no guaranteed sign; this approach avoids
-        # bisector flips between frames.
+        # Bisector: vector from apex toward the centroid of each arm
+        # (apex excluded from centroids to guarantee an unambiguous sign).
+        # SVD eigenvectors have no guaranteed sign; this approach
+        # avoids bisector flips between frames.
         right_centroid = np.array([xs[right_pos].mean(), ys[right_pos].mean()])
         left_centroid  = np.array([xs[left_pos].mean(),  ys[left_pos].mean()])
 
