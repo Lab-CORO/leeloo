@@ -26,9 +26,11 @@ class CalibrationNode(Node):
       4. Call the service again — capture 2/2.
          → The static TF 'prism_center' is published in 'odom'.
 
-    Geometry:
-      - 110° corner: offset of OFFSET_M along the LiDAR X axis (in odom).
-      - 135° corner: offset of OFFSET_M along the LiDAR Y axis (in odom).
+    Geometry (intersection method):
+      The prism center is the intersection of two lines in the odom XY plane:
+        - Line 1 (110° capture): passes through the detected apex along the LiDAR X axis.
+        - Line 2 (135° capture): passes through the detected apex along the LiDAR Y axis.
+      No fixed offset constant is required — the geometry is self-consistent.
 
     TF architecture:
       - The robot publishes its transforms on /r100_0597/tf[_static].
@@ -38,11 +40,9 @@ class CalibrationNode(Node):
         (more reliable than via the TF buffer for calibration).
     """
 
-    LIDAR_FRAME       = 'lidar2d_0_laser'
     BASE_FRAME        = 'base_link'
     ODOM_FRAME        = 'odom'
     TOOL_CENTER_FRAME = 'prism_center'
-    OFFSET_M          = -0.085   # center↔apex offset, negative direction along the LiDAR axis
 
     ODOM_TOPIC = '/r100_0597/platform/odom/filtered'
     # Robot TF topics (own namespace, separate from /tf global)
@@ -90,7 +90,8 @@ class CalibrationNode(Node):
         # ── Internal state ───────────────────────────────────────────────────
         self._latest_detection = None   # Most recent PrismDetection
         self._latest_odom      = None   # Most recent Odometry
-        self._first_capture    = None   # dict {'corner': int, 'center': np.ndarray}
+        # dict {'corner': int, 'apex': np.ndarray, 'direction': np.ndarray}
+        self._first_capture    = None
         self._calibration_done = False
 
         self.get_logger().info(
@@ -140,20 +141,26 @@ class CalibrationNode(Node):
 
         corner_type = self._latest_detection.detected_corner  # 110 or 135
 
-        center_odom = self._compute_center_in_odom(corner_type)
-        if center_odom is None:
+        result = self._compute_apex_and_direction_in_odom(corner_type)
+        if result is None:
             response.success = False
             response.message = (
-                f"FAILURE: unable to compute center for corner {corner_type}°."
+                f"FAILURE: unable to compute apex/direction for corner {corner_type}°."
             )
             return response
+        apex_odom, direction_odom = result
 
         if self._first_capture is None:
-            self._first_capture = {'corner': corner_type, 'center': center_odom}
+            self._first_capture = {
+                'corner': corner_type,
+                'apex': apex_odom,
+                'direction': direction_odom,
+            }
+            self._publish_corner_tf(corner_type, apex_odom)
             response.success = True
             response.message = (
                 f"Capture 1/2 — corner {corner_type}°: "
-                f"estimated center at ({center_odom[0]:.4f}, {center_odom[1]:.4f}, {center_odom[2]:.4f}) m in odom. "
+                f"apex at ({apex_odom[0]:.4f}, {apex_odom[1]:.4f}, {apex_odom[2]:.4f}) m in odom. "
                 "Move the robot to see the other corner."
             )
             self.get_logger().info(response.message)
@@ -168,20 +175,30 @@ class CalibrationNode(Node):
                 self.get_logger().warn(response.message)
                 return response
 
-            c1 = self._first_capture['center']
-            c2 = center_odom
-            center_final = (c1 + c2) / 2.0
-            delta_cm = float(np.linalg.norm(c1 - c2)) * 100.0
+            center_final = self._compute_center_from_intersection(
+                self._first_capture['apex'],      self._first_capture['direction'],
+                apex_odom,                        direction_odom,
+            )
+            if center_final is None:
+                response.success = False
+                response.message = (
+                    "FAILURE: the two measurement lines are parallel — "
+                    "cannot compute intersection."
+                )
+                self.get_logger().error(response.message)
+                return response
 
+            self._publish_corner_tf(corner_type, apex_odom)
             self._publish_center_tf(center_final)
             self._calibration_done = True
 
             response.success = True
             response.message = (
                 f"Capture 2/2 — corner {corner_type}°. "
-                f"Tool center published in '{self.ODOM_FRAME}': "
-                f"x={center_final[0]:.4f} m, y={center_final[1]:.4f} m, z={center_final[2]:.4f} m. "
-                f"XY gap between the two estimates: {delta_cm:.1f} cm."
+                f"Tool center published in '{self.ODOM_FRAME}' "
+                f"(intersection of LiDAR axes): "
+                f"x={center_final[0]:.4f} m, y={center_final[1]:.4f} m, "
+                f"z={center_final[2]:.4f} m."
             )
             self.get_logger().info(response.message)
 
@@ -189,22 +206,31 @@ class CalibrationNode(Node):
 
     # ── Geometry ──────────────────────────────────────────────────────────────
 
-    def _compute_center_in_odom(self, corner_type):
-        """Return the tool center position in odom.
+    def _compute_apex_and_direction_in_odom(self, corner_type):
+        """Return the apex position and the bisector direction in odom.
 
         Steps:
           1. Look up 'prism_tool' in 'base_link' via the global TF buffer.
              (chain: base_link → chassis_link → lidar2d_0_link →
               lidar2d_0_laser → prism_tool — entirely in /tf and /tf_static)
-          2. Look up 'lidar2d_0_laser' in 'base_link' (static, always available).
-          3. Read the odom → base_link pose from the odometry message.
-          4. Transform the apex from base_link to odom.
-          5. Compute the LiDAR axes in odom and apply the offset.
+          2. Read the odom → base_link pose from the odometry message.
+          3. Transform the apex from base_link to odom.
+          4. Extract the bisector direction from the prism_tool orientation.
+
+        The bisector direction (apex → prism center) is encoded in 'prism_tool'
+        by prism_detector_node:
+          - 110° corner: center lies along prism_tool X axis (yaw = bisector angle)
+          - 135° corner: center lies along prism_tool Y axis (yaw = bisector angle − 90°)
 
         Returns:
-            np.ndarray (3,) — (x, y, z) in odom — or None if a lookup fails.
+            (apex_odom, direction_odom) where:
+              apex_odom      — np.ndarray (3,): apex in odom, matches 'prism_tool'
+                               at capture time.
+              direction_odom — np.ndarray (2,): unit vector in odom XY pointing from
+                               the apex toward the prism center.
+            Returns None if a TF lookup fails.
         """
-        # 1. Corner apex in base_link
+        # 1. Apex position and prism_tool orientation in base_link
         try:
             tf_corner = self.tf_buffer.lookup_transform(
                 self.BASE_FRAME, 'prism_tool', rclpy.time.Time()
@@ -213,57 +239,107 @@ class CalibrationNode(Node):
             self.get_logger().error(f"Lookup prism_tool → {self.BASE_FRAME} failed: {ex}")
             return None
 
-        # 2. LiDAR orientation in base_link (static)
-        try:
-            tf_lidar = self.tf_buffer.lookup_transform(
-                self.BASE_FRAME, self.LIDAR_FRAME, rclpy.time.Time()
-            )
-        except TransformException as ex:
-            self.get_logger().error(
-                f"Lookup {self.LIDAR_FRAME} → {self.BASE_FRAME} failed: {ex}"
-            )
-            return None
-
-        # 3. Pose odom → base_link from odometry
+        # 2. Pose odom → base_link from odometry
         odom_pos  = self._latest_odom.pose.pose.position
         odom_quat = self._latest_odom.pose.pose.orientation
         odom_yaw  = 2.0 * math.atan2(odom_quat.z, odom_quat.w)
         cos_o = math.cos(odom_yaw)
         sin_o = math.sin(odom_yaw)
 
-        # 4. Apex in odom (rotation from base_link → odom applied on X and Y;
-        #    Z preserved since the robot is on the ground — yaw rotation only)
+        # 3. Apex in odom (yaw-only rotation, robot on flat ground)
         cx = tf_corner.transform.translation.x
         cy = tf_corner.transform.translation.y
         cz = tf_corner.transform.translation.z
-        corner_in_odom = np.array([
+        apex_odom = np.array([
             odom_pos.x + cos_o * cx - sin_o * cy,
             odom_pos.y + sin_o * cx + cos_o * cy,
             odom_pos.z + cz,
         ])
 
-        # 5. LiDAR axes in odom
-        q_lidar = tf_lidar.transform.rotation
-        lidar_yaw_in_base = 2.0 * math.atan2(q_lidar.z, q_lidar.w)
-        lidar_yaw_in_odom = odom_yaw + lidar_yaw_in_base
-        lidar_x_in_odom = np.array([ math.cos(lidar_yaw_in_odom), math.sin(lidar_yaw_in_odom)])
-        lidar_y_in_odom = np.array([-math.sin(lidar_yaw_in_odom), math.cos(lidar_yaw_in_odom)])
+        # 4. Bisector direction in odom, derived from prism_tool orientation.
+        #    prism_tool yaw in base_link already includes the LiDAR mounting yaw
+        #    (TF chain: lidar2d_0_laser → prism_tool → ... → base_link).
+        #    Composing with odom_yaw gives the tool yaw in odom.
+        q_tool = tf_corner.transform.rotation
+        yaw_tool_in_base = 2.0 * math.atan2(q_tool.z, q_tool.w)
+        yaw_tool_in_odom = odom_yaw + yaw_tool_in_base
 
         if corner_type == 110:
-            xy = corner_in_odom[:2] + self.OFFSET_M * lidar_x_in_odom
+            # Center along prism_tool X axis (yaw_tool = bisector angle)
+            direction_odom = np.array([math.cos(yaw_tool_in_odom),
+                                       math.sin(yaw_tool_in_odom)])
         elif corner_type == 135:
-            xy = corner_in_odom[:2] + self.OFFSET_M * lidar_y_in_odom
+            # Center along prism_tool Y axis (yaw_tool = bisector angle − 90°)
+            direction_odom = np.array([-math.sin(yaw_tool_in_odom),
+                                        math.cos(yaw_tool_in_odom)])
         else:
             self.get_logger().error(f"Unsupported corner type: {corner_type}°")
             return None
 
-        return np.array([xy[0], xy[1], corner_in_odom[2]])
+        return apex_odom, direction_odom
+
+    def _compute_center_from_intersection(self, apex1, dir1, apex2, dir2):
+        """Find the prism center as the intersection of two lines in odom XY.
+
+        Line 1: apex1 + t * dir1  (LiDAR X axis from the 110° capture)
+        Line 2: apex2 + s * dir2  (LiDAR Y axis from the 135° capture)
+
+        Solves the 2×2 linear system:
+            t * dir1 - s * dir2 = apex2 - apex1
+
+        Returns:
+            np.ndarray (3,) — intersection point in odom, Z averaged from both
+            apices — or None if the lines are parallel (det ≈ 0).
+        """
+        A = np.array([[dir1[0], -dir2[0]],
+                      [dir1[1], -dir2[1]]])
+        if abs(np.linalg.det(A)) < 1e-8:
+            return None
+
+        b = apex2[:2] - apex1[:2]
+        t, s = np.linalg.solve(A, b)
+
+        xy = apex1[:2] + t * dir1
+        z  = (apex1[2] + apex2[2]) / 2.0
+
+        self.get_logger().info(
+            f"Intersection: t={t:.4f} m from apex1, s={s:.4f} m from apex2 "
+            f"(these are the apex→center distances along each LiDAR axis)."
+        )
+
+        return np.array([xy[0], xy[1], z])
+
+    def _publish_corner_tf(self, corner_type, apex_odom):
+        """Publish a static TF freezing the detected apex for one corner capture.
+
+        Frame name: 'prism_corner_110' or 'prism_corner_135'.
+        Position:   apex of the detected corner in odom — coincides with 'prism_tool'
+                    at the moment the capture was triggered.
+        Orientation: identity (position-only reference marker).
+
+        Note: StaticTransformBroadcaster re-broadcasts all previously sent transforms
+        alongside the new one, so earlier corner TFs are not lost.
+        """
+        frame_id = f'prism_corner_{corner_type}'
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = self.ODOM_FRAME
+        t.child_frame_id = frame_id
+        t.transform.translation.x = float(apex_odom[0])
+        t.transform.translation.y = float(apex_odom[1])
+        t.transform.translation.z = float(apex_odom[2])
+        t.transform.rotation.w = 1.0
+        self.tf_static_broadcaster.sendTransform(t)
+        self.get_logger().info(
+            f"Static TF '{frame_id}' (apex) published in '{self.ODOM_FRAME}': "
+            f"x={apex_odom[0]:.4f} m, y={apex_odom[1]:.4f} m, z={apex_odom[2]:.4f} m."
+        )
 
     def _publish_center_tf(self, center_odom):
         """Publish the static TF of the tool center in the odom frame.
 
         Orientation: 90° rotation around Z relative to identity.
-        Z:           same as prism_tool (LiDAR height in odom).
+        Z:           average of the two apex heights in odom.
         """
         yaw_90 = math.pi / 2.0
         t = TransformStamped()
