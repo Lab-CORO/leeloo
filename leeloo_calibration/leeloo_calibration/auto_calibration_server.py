@@ -288,10 +288,16 @@ class AutoCalibrationNode(Node):
             if cap_resp is None:
                 self.get_logger().error(f'  [capture] Pose {i + 1} : timeout ou annulé.')
             elif cap_resp.success:
-                self.get_logger().info(f'  [capture] Sample capturé (pose {i + 1}).')
+                self.get_logger().info(f'  [capture] Sample capturé (pose {i + 1}) : {cap_resp.message}')
                 t = cap_resp.transform
-                if any([t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w]):
+                is_identity = (t.translation.x == 0.0 and t.translation.y == 0.0 and
+                               t.translation.z == 0.0 and t.rotation.x == 0.0 and
+                               t.rotation.y == 0.0 and t.rotation.z == 0.0 and
+                               t.rotation.w == 1.0)
+                if not is_identity:
                     last_calibration_transform = t
+                else:
+                    self.get_logger().warn(f'  [capture] Pose {i + 1} : pas encore assez de samples.')
             else:
                 self.get_logger().warn(f'  [capture] Pose {i + 1} : {cap_resp.message}')
 
@@ -360,7 +366,6 @@ class AutoCalibrationNode(Node):
                 (self._gen_client,     'generate_trajectory'),
                 (self._planner_client, 'set_planner'),
                 (self._capture_client, 'capture_point'),
-                (self._reset_client,   'reset_samples'),
             ]
             if not client.service_is_ready()
         ]

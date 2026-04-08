@@ -190,6 +190,54 @@ Exposes service `~/reload_calibration` (`std_srvs/Trigger`) to hot-reload the ca
 ---
 
 
+---
+
+## LiDAR-based Tool Localization (`object_lidar_calib`)
+
+A standalone calibration module that locates a **prismatic calibration tool** using the 2D LiDAR of a Clearpath Ridgeback mobile base.
+The result is a static TF (`prism_center` in `odom`) giving the tool center position.
+
+### Packages
+
+| Package | Description |
+|---|---|
+| `object_lidar_calib` | ROS 2 nodes for prism detection and tool-center computation |
+| `object_lidar_calib_msgs` | Custom message type `PrismDetection` (in `leeloo_msgs`) |
+
+### Nodes
+
+| Node | Role |
+|---|---|
+| `prism_detector_node` | Detects the prism corners (110° and 135°) in each LiDAR scan and publishes the tool pose on `/prism_detection` |
+| `calibration_node` | Accumulates two captures from different corners, computes the tool center, and broadcasts the static TF `prism_center` in `odom` |
+
+### Workflow
+
+1. Start both nodes.
+2. Position the Ridgeback in front of one corner of the prism (110° or 135°).
+3. Call the capture service:
+   ```bash
+   ros2 service call /capture_calibration_data std_srvs/srv/Trigger {}
+   ```
+4. Move the robot to face the other corner.
+5. Call the service again → the static TF `prism_center` is published.
+
+### LiDAR configuration
+
+The nodes expect the Ridgeback's 2D LiDAR on topic `/r100_0597/sensors/lidar2d_0/scan` and the robot TF tree on `/r100_0597/tf[_static]`.
+
+### Topics and services
+
+| Name | Type | Direction |
+|---|---|---|
+| `/r100_0597/sensors/lidar2d_0/scan` | `sensor_msgs/LaserScan` | subscribed |
+| `/r100_0597/platform/odom/filtered` | `nav_msgs/Odometry` | subscribed |
+| `/prism_detection` | `object_lidar_calib_msgs/PrismDetection` | published |
+| `/filtered_scan` | `sensor_msgs/LaserScan` | published (RViz debug) |
+| `/capture_calibration_data` | `std_srvs/Trigger` | service |
+
+---
+
 ## Related Packages
 
 - [`curobo_ros`](https://github.com/Lab-CORO/curobo_ros) — GPU trajectory planning with cuRobo
