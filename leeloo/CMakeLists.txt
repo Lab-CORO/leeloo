@@ -11,6 +11,9 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(dsr_msgs2 REQUIRED)
 find_package(trajectory_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(curobo_msgs REQUIRED)
 
 
 
@@ -32,6 +35,9 @@ endif()
 
 add_executable(execute_trajectory src/execute_trajectory.cpp)
 ament_target_dependencies(execute_trajectory rclcpp std_msgs dsr_msgs2 trajectory_msgs)
+
+add_executable(voxel_map_publisher src/voxel_map_publisher.cpp)
+ament_target_dependencies(voxel_map_publisher rclcpp visualization_msgs geometry_msgs curobo_msgs)
 
 include_directories(
   include
@@ -57,6 +63,7 @@ install(DIRECTORY urdf
 
 install(TARGETS
   execute_trajectory
+  voxel_map_publisher
   DESTINATION lib/${PROJECT_NAME}
 )
 ament_package()

@@ -2,7 +2,7 @@
 """
 auto_calibration_server_v2.py
 =============================
-Noeud ROS2  –  package : leeloo_calibration
+Noeud ROS2    package : leeloo_calibration
 
 Action server RunCalibration (leeloo_msgs/action/RunCalibration).
 La calibration démarre uniquement sur réception d'un goal.
@@ -26,7 +26,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 
 from std_srvs.srv import Trigger
-from ros2_markertracker_interfaces.srv import CapturePoint
+from ros2_handeye_calibration_interface.srv import CapturePoint
 from curobo_msgs.srv import TrajectoryGeneration, SetPlanner
 from curobo_msgs.action import SendTrajectory
 from leeloo_msgs.action import RunCalibration
@@ -209,7 +209,7 @@ class AutoCalibrationNode(Node):
                 self._running = False
                 return result
 
-            j1, j2, j3, j4, j5, j6 = pose[0], pose[1], pose[4], pose[2], pose[3], pose[5]
+            j1, j2, j3, j4, j5, j6 = pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]
             self.get_logger().info(
                 f'--- Pose {i + 1}/{total} '
                 f'[j1={j1:.2f} j2={j2:.2f} j3={j3:.2f} '
@@ -290,7 +290,10 @@ class AutoCalibrationNode(Node):
             elif cap_resp.success:
                 self.get_logger().info(f'  [capture] Sample capturé (pose {i + 1}).')
                 t = cap_resp.transform
-                if any([t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w]):
+                has_translation = (
+                    abs(t.translation.x) + abs(t.translation.y) + abs(t.translation.z)
+                ) > 0.01
+                if has_translation:
                     last_calibration_transform = t
             else:
                 self.get_logger().warn(f'  [capture] Pose {i + 1} : {cap_resp.message}')
@@ -360,7 +363,6 @@ class AutoCalibrationNode(Node):
                 (self._gen_client,     'generate_trajectory'),
                 (self._planner_client, 'set_planner'),
                 (self._capture_client, 'capture_point'),
-                (self._reset_client,   'reset_samples'),
             ]
             if not client.service_is_ready()
         ]
@@ -377,9 +379,6 @@ class AutoCalibrationNode(Node):
             return None, f'Fichier de poses introuvable : {poses_file}'
         with open(poses_file, 'r') as f:
             data = yaml.safe_load(f)
-        # PATCH TEMPORAIRE : calib_order du YAML est faux (double inversion dans pose_saver_node —
-        # _CALIB_ORDER conçu pour input [J1,J2,J3,J4,J5,J6] mais le topic DSR publie
-        # [J1,J2,J4,J5,J3,J6]). Le champ 'positions' est lui directement du topic, donc correct.
         poses_entries = data.get('poses', [])
         if not poses_entries:
             return None, f'Clé "poses" vide ou absente dans {poses_file}'

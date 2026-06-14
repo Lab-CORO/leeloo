@@ -19,8 +19,16 @@ else
 fi
 
 if ! [[ "$OSTYPE" == "msys" ]]; then
-    # Assurez-vous que le serveur X11 autorise les connexions depuis Docker
-    xhost +local:docker
+    # Allow X11 connections from Docker only if a display is available
+    if [ -n "$DISPLAY" ]; then
+        xhost +local:docker
+    fi
+
+    # The container entrypoint starts its own Xvfb virtual display on :99.
+    # Do not forward the host display: the Kinect depth engine uses software
+    # OpenGL (Mesa LLVMpipe) and does not need a hardware X server.
+    DISPLAY_FLAGS=""
+
 
     # Exécutez le conteneur Docker avec les bonnes options
     docker run --name leeloo_docker -it \
@@ -28,12 +36,12 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
         -e NVIDIA_DISABLE_REQUIRE=1 \
         -e NVIDIA_DRIVER_CAPABILITIES=all \
         --device=/dev/:/dev/ \
+        -v /dev/bus/usb:/dev/bus/usb \
         --hostname ros1-docker \
         --add-host ros1-docker:127.0.0.1 \
         --gpus all \
         --network host \
-        -e DISPLAY=$DISPLAY \
-        -v /tmp/.X11-unix:/tmp/.X11-unix \
+        $DISPLAY_FLAGS \
         -v ./curobo_ros:/home/ros2_ws/src/curobo_ros\
         -v ./curobo_rviz:/home/ros2_ws/src/curobo_rviz\
         -v ./curobo_msgs:/home/ros2_ws/src/curobo_msgs\
@@ -44,10 +52,11 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
         -v ./leeloo:/home/ros2_ws/src/leeloo \
         -v ./leeloo_calibration:/home/ros2_ws/src/leeloo_calibration \
         -v ./leeloo_msgs:/home/ros2_ws/src/leeloo_msgs \
+        -v /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra \
         --cap-add=sys_nice \
         --ulimit rtprio=99 \
         --ulimit memlock=-1 \
-        leeloo_docker:x86 
+        leeloo_docker:aarch64
 else
     echo "Detected OS is msys, make sure to have an X server running on your host machine"
     # Exécutez seulement le conteneur Docker avec les options appropriées

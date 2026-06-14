@@ -25,6 +25,8 @@ setup(
             'auto_calibration_server = leeloo_calibration.auto_calibration_server:main',
             'kinect_tf_computation_node = leeloo_calibration.kinect_tf_computation_node:main',
             'pose_saver_node = leeloo_calibration.pose_saver_node:main',
+            'pose_generator_node = leeloo_calibration.pose_generator_node:main',
+            'manual_tf_calibration_node = leeloo_calibration.manual_tf_calibration_node:main',
         ],
     },
 )

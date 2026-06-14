@@ -20,6 +20,7 @@ Enregistrer une pose :
 """
 
 import enum
+import math
 import os
 from datetime import datetime
 
@@ -27,10 +28,13 @@ import yaml
 
 import rclpy
 from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
 from dsr_msgs2.srv import SetRobotMode, SetSafetyMode
+from curobo_msgs.srv import GetCollisionDistance
 
 
 # =============================================================================
@@ -76,19 +80,36 @@ class PoseSaverNode(Node):
         joint_topic     = self.get_parameter('joint_states_topic').value
         self._output    = self.get_parameter('output_file').value
 
+        self.declare_parameter('collision_distance_service',
+                               '/unified_planner/get_collision_distance')
+        collision_srv = self.get_parameter('collision_distance_service').value
+
+        self.declare_parameter('load_existing_poses', True)
+
         # ---- Clients DSR -----------------------------------------------------
         self._robot_mode_client  = self.create_client(SetRobotMode,  robot_mode_srv)
         self._safety_mode_client = self.create_client(SetSafetyMode, safety_mode_srv)
+
+        # ---- Collision check client (reentrant — called from service callback) ---
+        self._reentrant_group = ReentrantCallbackGroup()
+        self._collision_client = self.create_client(
+            GetCollisionDistance, collision_srv,
+            callback_group=self._reentrant_group)
 
         # ---- Subscription joint states (dernier message conservé) ------------
         self._last_js: JointState | None = None
         self.create_subscription(JointState, joint_topic, self._on_joint_states, 10)
 
-        # ---- Service /save_pose ----------------------------------------------
-        self.create_service(Trigger, 'save_pose', self._on_save_pose)
+        # ---- Services -----------------------------------------------------------
+        self.create_service(Trigger, 'save_pose', self._on_save_pose,
+                            callback_group=self._reentrant_group)
+        self.create_service(Trigger, 'info_calibration', self._on_info_calibration,
+                            callback_group=self._reentrant_group)
 
         # ---- Données de session ----------------------------------------------
         self._poses: list[dict] = []
+        if self.get_parameter('load_existing_poses').value:
+            self._load_existing_yaml()
 
         # ---- Machine à états -------------------------------------------------
         self._state          : State = State.WAITING_FOR_SERVICES
@@ -213,6 +234,35 @@ class PoseSaverNode(Node):
         self._last_js = msg
 
     # =========================================================================
+    # Collision check
+    # =========================================================================
+
+    def _check_collision(self) -> tuple[bool, str]:
+        """Returns (ok, reason). ok=True → safe to save. ok=False → reject pose."""
+        return True, ''
+        if not self._collision_client.service_is_ready():
+            self.get_logger().warn(
+                '[collision] Service unavailable — skipping collision check.')
+            return True, ''
+        future = self._collision_client.call_async(GetCollisionDistance.Request())
+        rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
+        if not future.done() or future.result() is None:
+            self.get_logger().warn('[collision] Timeout — skipping collision check.')
+            return True, ''
+        # Sign convention: negative = clearance (free), positive = penetration (collision).
+        # cuRobo clamps clearance at -0.10 m, so any d > 0 means actual collision.
+        data = list(future.result().data)
+        colliding = [d for d in data if d > 0.0]
+        if colliding:
+            return False, f'Collision detected (max penetration = {max(colliding):.4f} m)'
+        near = [d for d in data if -0.05 < d <= 0.0]
+        if near:
+            self.get_logger().warn(
+                f'[collision] Near obstacle ({len(near)} sphere(s) < 5 cm clearance, '
+                f'max={max(near):.4f} m) — saving anyway.')
+        return True, ''
+
+    # =========================================================================
     # Service /save_pose
     # =========================================================================
 
@@ -220,44 +270,151 @@ class PoseSaverNode(Node):
         if self._state != State.READY:
             response.success = False
             response.message = (
-                f'Node pas encore prêt (état : {self._state.value}). '
-                f'Réessaie dans quelques secondes.')
+                f'Node not ready yet (state: {self._state.value}). '
+                f'Try again in a few seconds.')
             return response
 
         if self._last_js is None:
             response.success = False
-            response.message = 'Aucune donnée reçue sur le topic joint_states.'
+            response.message = 'No data received on joint_states topic.'
             return response
 
-        names     = list(self._last_js.name)
-        positions = list(self._last_js.position)
-
-        # Positions brutes (J1, J2, J3, J4, J5, J6)
-        raw = [round(p, 10) for p in positions]
-
-        # Positions réordonnées pour CALIBRATION_POSES (J1, J2, J4, J5, J3, J6)
+        names = list(self._last_js.name)
+        raw   = [round(p, 10) for p in self._last_js.position]
         calib = [raw[i] for i in _CALIB_ORDER]
+
+        ok, reason = self._check_collision()
+        if not ok:
+            response.success = False
+            response.message = f'Pose not saved: {reason}'
+            self.get_logger().warn(f'[save_pose] {response.message}')
+            return response
+
+        redundant, reason = self._is_redundant(calib)
+        if redundant:
+            response.success = False
+            response.message = f'Pose not saved: {reason}'
+            self.get_logger().warn(f'[save_pose] {response.message}')
+            return response
 
         pose_num = len(self._poses) + 1
         self._poses.append({
-            'index':      pose_num,
-            'timestamp':  datetime.now().isoformat(timespec='seconds'),
+            'index':       pose_num,
+            'timestamp':   datetime.now().isoformat(timespec='seconds'),
             'joint_names': names,
-            'positions':  raw,   # ordre natif du topic
-            'calib_order': calib,  # ordre (J1,J2,J4,J5,J3,J6) pour CALIBRATION_POSES
+            'positions':   raw,
+            'calib_order': calib,
         })
 
         self._write_yaml()
 
         log_str = ', '.join(f'{n}={p:.4f}' for n, p in zip(names, raw))
-        self.get_logger().info(
-            f'[save_pose] Pose {pose_num} enregistrée : {log_str}')
+        self.get_logger().info(f'[save_pose] Pose {pose_num} saved: {log_str}')
 
         response.success = True
         response.message = (
-            f'Pose {pose_num} sauvegardée. '
-            f'Total : {len(self._poses)} pose(s). '
-            f'Fichier : {self._output}')
+            f'Pose {pose_num} saved. '
+            f'Total: {len(self._poses)} pose(s). '
+            f'File: {self._output}')
+        return response
+
+    # =========================================================================
+    # Load existing YAML
+    # =========================================================================
+
+    def _load_existing_yaml(self):
+        if not os.path.isfile(self._output):
+            return
+        try:
+            with open(self._output) as f:
+                data = yaml.safe_load(f)
+            existing = data.get('poses', [])
+            if existing:
+                self._poses = list(existing)
+                self.get_logger().info(
+                    f'[init] Loaded {len(self._poses)} existing pose(s) from {self._output}')
+        except Exception as e:
+            self.get_logger().warn(f'[init] Could not load existing YAML: {e}')
+
+    # =========================================================================
+    # Redundancy guard
+    # =========================================================================
+
+    _REDUNDANCY_THRESHOLD = 0.5  # rad (Euclidean distance in 6D joint space)
+
+    def _is_redundant(self, calib: list[float]) -> tuple[bool, str]:
+        for p in self._poses:
+            existing = p['calib_order']
+            if len(existing) != len(calib):
+                continue
+            dist = math.sqrt(sum((a - b) ** 2 for a, b in zip(calib, existing)))
+            if dist < self._REDUNDANCY_THRESHOLD:
+                return True, (
+                    f"Too close to pose {p['index']} "
+                    f"(joint-space distance = {dist:.3f} rad "
+                    f"< {self._REDUNDANCY_THRESHOLD} rad)")
+        return False, ''
+
+    # =========================================================================
+    # Coverage report  (/info_calibration service)
+    # =========================================================================
+
+    def _build_coverage_report(self) -> str:
+        MIN_POSES = 15
+        lines = ['=== Calibration coverage report ===']
+        n = len(self._poses)
+        lines.append(
+            f'Recorded poses : {n} / {MIN_POSES} recommended'
+            + (' [OK]' if n >= MIN_POSES else ' [MISSING]'))
+
+        j1s = [p['calib_order'][0] for p in self._poses]
+        j2s = [p['calib_order'][1] for p in self._poses]
+        j3s = [p['calib_order'][2] for p in self._poses]
+
+        def j1_zone(v): return 'Left'   if v < -0.5 else ('Right' if v > 0.5 else 'Center')
+        def j2_zone(v): return 'Negative' if v < 0  else ('Low'   if v < 0.5 else 'High')
+
+        zones_present = {(j1_zone(j1), j2_zone(j2)) for j1, j2 in zip(j1s, j2s)}
+        all_zones     = [(j1z, j2z)
+                         for j1z in ('Left', 'Center', 'Right')
+                         for j2z in ('Negative', 'Low', 'High')]
+
+        covered = [z for z in all_zones if z     in zones_present]
+        missing = [z for z in all_zones if z not in zones_present]
+
+        lines.append(f'\nj1 x j2 zones covered ({len(covered)}/9):')
+        for z in covered:
+            lines.append(f'  [OK]      j1={z[0]}, j2={z[1]}')
+        if missing:
+            lines.append(f'\nj1 x j2 zones missing ({len(missing)}/9):')
+            for z in missing:
+                lines.append(f'  [MISSING] j1={z[0]}, j2={z[1]}')
+
+        elbow_up   = sum(1 for j in j3s if j >  0.1)
+        elbow_down = sum(1 for j in j3s if j < -0.1)
+        lines.append('\nElbow configuration:')
+        lines.append(
+            f'  Elbow up   (j3 > +0.1) : {elbow_up} pose(s)'
+            + ('' if elbow_up   >= 3 else ' [MISSING] (< 3 recommended)'))
+        lines.append(
+            f'  Elbow down (j3 < -0.1) : {elbow_down} pose(s)'
+            + ('' if elbow_down >= 3 else ' [MISSING] (< 3 recommended)'))
+
+        risky = [p['index'] for p in self._poses if p['calib_order'][1] > 1.8]
+        if risky:
+            lines.append(
+                f'\nRisky poses (j2 > 1.2 rad -> likely GRAPH_FAIL): {risky}')
+
+        return '\n'.join(lines)
+
+    def _on_info_calibration(self, _request, response):
+        if not self._poses:
+            response.success = False
+            response.message = 'No poses recorded.'
+            return response
+        response.success = True
+        response.message = self._build_coverage_report()
+        self.get_logger().info(f'\n{response.message}')
         return response
 
     # =========================================================================
@@ -309,8 +466,10 @@ class PoseSaverNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = PoseSaverNode()
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
