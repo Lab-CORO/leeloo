@@ -10,7 +10,7 @@
 cameras:
   - name: depth_map_test
     type: depth_camera
-    topic: /masked_depth_image/image_raw
+    topic: /masked_depth_image
     frame_id: "rgb_camera_link"
     camera_info: /depth_to_rgb/camera_info
     intrinsic_matrix: []
