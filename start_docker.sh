@@ -56,7 +56,7 @@ if ! [[ "$OSTYPE" == "msys" ]]; then
         --cap-add=sys_nice \
         --ulimit rtprio=99 \
         --ulimit memlock=-1 \
-        leeloo_docker:aarch64
+        leeloo_docker:aarch64-jazzy
 else
     echo "Detected OS is msys, make sure to have an X server running on your host machine"
     # Exécutez seulement le conteneur Docker avec les options appropriées

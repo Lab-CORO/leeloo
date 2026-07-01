@@ -27,10 +27,17 @@ class kinectTFComputationNode(Node):
         self.declare_parameter('calibration_result_file',
             '/home/ros2_ws/src/leeloo_calibration/config/kinect_hand_eye_result.yaml')
 
-        # base_link → rgb_camera_link loaded from hand-eye calibration YAML.
-        self.base_link_to_rgb = TransformStamped()
-        self.base_link_to_rgb.header.frame_id = 'base_link'
-        self.base_link_to_rgb.child_frame_id = 'rgb_camera_link'
+        # Robot base frame the camera is calibrated against. Default 'dsr01/world'
+        # (Doosan arm root once frame_prefix='dsr01/' is applied; world≡base_link
+        # are coincident). Anchoring the camera here links it to the arm tree
+        # regardless of the Ridgeback.
+        self.declare_parameter('robot_base_frame', 'dsr01/world')
+        self.robot_base_frame = self.get_parameter('robot_base_frame').value
+
+        # robot_base_frame → rgb_camera_link loaded from hand-eye calibration YAML.
+        self.base_to_rgb = TransformStamped()
+        self.base_to_rgb.header.frame_id = self.robot_base_frame
+        self.base_to_rgb.child_frame_id = 'rgb_camera_link'
         self._load_calibration()
 
         # Cached camera_base ← rgb_camera_link (static, from Kinect URDF).
@@ -62,16 +69,16 @@ class kinectTFComputationNode(Node):
         self._camera_tf_cached = rgb_to_cam
         self._publish_static_tf()
         self._init_timer.cancel()
-        self.get_logger().info('world→camera_base static TF published.')
+        self.get_logger().info('robot_base_frame→camera_base static TF published.')
 
     # ── Publishing ────────────────────────────────────────────────────────────
 
     def _publish_static_tf(self):
-        """Compute and broadcast the static world→camera_base transform."""
+        """Compute and broadcast the static robot_base_frame→camera_base transform."""
         if self._camera_tf_cached is None or not self._publication_enabled:
             return
-        result_tf = self.compute_base_link_to_camera_base(
-            self._camera_tf_cached, self.base_link_to_rgb)
+        result_tf = self.compute_base_to_camera_base(
+            self._camera_tf_cached, self.base_to_rgb)
         result_tf.header.stamp = self.get_clock().now().to_msg()
         self.tf_static_broadcaster.sendTransform(result_tf)
 
@@ -97,23 +104,23 @@ class kinectTFComputationNode(Node):
         return response
 
     def _load_calibration(self):
-        """Load base_link→rgb_camera_link from the hand-eye calibration YAML."""
+        """Load robot_base_frame→rgb_camera_link from the hand-eye calibration YAML."""
         filepath = self.get_parameter('calibration_result_file').value
         if not os.path.isfile(filepath):
             self.get_logger().warn(
                 f'Fichier de calibration introuvable : {filepath}. '
-                'Le transform base_link→rgb_camera_link ne sera pas publié.')
+                'Le transform robot_base_frame→rgb_camera_link ne sera pas publié.')
             return
         with open(filepath, 'r') as f:
             data = yaml.safe_load(f)
         t = data['transform']
-        self.base_link_to_rgb.transform.translation.x = t['translation']['x']
-        self.base_link_to_rgb.transform.translation.y = t['translation']['y']
-        self.base_link_to_rgb.transform.translation.z = t['translation']['z']
-        self.base_link_to_rgb.transform.rotation.x = t['rotation']['x']
-        self.base_link_to_rgb.transform.rotation.y = t['rotation']['y']
-        self.base_link_to_rgb.transform.rotation.z = t['rotation']['z']
-        self.base_link_to_rgb.transform.rotation.w = t['rotation']['w']
+        self.base_to_rgb.transform.translation.x = t['translation']['x']
+        self.base_to_rgb.transform.translation.y = t['translation']['y']
+        self.base_to_rgb.transform.translation.z = t['translation']['z']
+        self.base_to_rgb.transform.rotation.x = t['rotation']['x']
+        self.base_to_rgb.transform.rotation.y = t['rotation']['y']
+        self.base_to_rgb.transform.rotation.z = t['rotation']['z']
+        self.base_to_rgb.transform.rotation.w = t['rotation']['w']
         self.get_logger().info(
             f'Calibration chargée depuis {filepath} : '
             f'tx={t["translation"]["x"]:.4f} ty={t["translation"]["y"]:.4f} '
@@ -123,21 +130,25 @@ class kinectTFComputationNode(Node):
 
     # ── Computation ───────────────────────────────────────────────────────────
 
-    def compute_base_link_to_camera_base(self, rgb_to_cam, base_link_to_rgb):
+    def compute_base_to_camera_base(self, rgb_to_cam, base_to_rgb):
         """
-        Compute world→camera_base from:
-          - base_link→rgb_camera_link  (hand-eye calibration result)
+        Compute robot_base_frame→camera_base from:
+          - robot_base_frame→rgb_camera_link  (hand-eye calibration result)
           - rgb_camera_link→camera_base (static, from Kinect URDF via TF)
         """
         T_rgb_to_camera_base = ros2_numpy.numpify(rgb_to_cam.transform)
-        T_base_link_to_rgb = ros2_numpy.numpify(base_link_to_rgb.transform)
-        T_base_link_camera_base = np.dot(T_base_link_to_rgb, inv(T_rgb_to_camera_base))
+        T_base_to_rgb = ros2_numpy.numpify(base_to_rgb.transform)
+        T_base_camera_base = np.dot(T_base_to_rgb, inv(T_rgb_to_camera_base))
 
-        translation = tf_transformations.translation_from_matrix(T_base_link_camera_base)
-        rotation = tf_transformations.quaternion_from_matrix(T_base_link_camera_base)
+        translation = tf_transformations.translation_from_matrix(T_base_camera_base)
+        rotation = tf_transformations.quaternion_from_matrix(T_base_camera_base)
 
         result_tf = TransformStamped()
-        result_tf.header.frame_id = 'world'
+        # robot_base_frame (défaut dsr01/world) : racine du bras Doosan. La caméra
+        # est rattachée au BRAS (et non base_link/Ridgeback) via le résultat
+        # hand-eye, ce qui raccorde camera_base au bras indépendamment de la base
+        # mobile : caméra et bras partagent cette frame comme ancêtre commun.
+        result_tf.header.frame_id = self.robot_base_frame
         result_tf.child_frame_id = 'camera_base'
         result_tf.transform.translation.x = translation[0]
         result_tf.transform.translation.y = translation[1]

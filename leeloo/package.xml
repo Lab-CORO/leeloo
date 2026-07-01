@@ -10,6 +10,9 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <exec_depend>leeloo_calibration</exec_depend>
+  <!-- Arbre TF unifié /leeloo : RSP structure + relais topic_tools -->
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>topic_tools</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

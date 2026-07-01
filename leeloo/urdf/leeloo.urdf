@@ -850,55 +850,14 @@
       </geometry>
     </visual>
   </link>
-  <material name="grey">
-    <color rgba="0.6 0.6 0.6 1"/>
-  </material>
-  <link name="camera_body">
-    <visual>
-      <origin xyz="0. 0. 0."/>
-      <geometry>
-        <box size="0.0994 0.0996 0.023"/>
-      </geometry>
-      <material name="white"/>
-    </visual>
-  </link>
-  <link name="camera_base">
-    <visual>
-      <origin xyz="-0.013 0. 0."/>
-      <geometry>
-        <box size="0.026 0.103 0.039"/>
-      </geometry>
-      <material name="grey"/>
-    </visual>
-  </link>
-  <link name="camera_visor">
-    <visual>
-      <origin xyz="-0.0128 0. 0."/>
-      <geometry>
-        <box size="0.026 0.101 0.037"/>
-      </geometry>
-      <material name="black"/>
-    </visual>
-  </link>
-  <joint name="camera_base_to_body" type="fixed">
-    <parent link="camera_base"/>
-    <child link="camera_body"/>
-    <origin rpy="0. 0. 0." xyz="-0.0757 0. 0.008"/>
-  </joint>
-  <joint name="camera_base_to_visor" type="fixed">
-    <parent link="camera_base"/>
-    <child link="camera_visor"/>
-    <origin rpy="0. 0. 0." xyz="0. 0. 0."/>
-  </joint>
   <!-- Connect m1013 robot arm to ridgeback base -->
   <joint name="arm_mount_joint" type="fixed">
     <parent link="robot_mount"/>
     <child link="base_0"/>
     <origin rpy="0 0 0" xyz="0 0 0"/>
   </joint>
-  <joint name="camera_joint" type="fixed">
-    <parent link="base_0"/>
-    <child link="camera_base"/>
-    <origin rpy="0.3666 0.7854 0.2668" xyz="-0.1290 -0.3955 0.8821"/>
-  </joint>
+  <!-- NOTE: la caméra Azure Kinect (camera_base/body/visor) n'est PLUS dans ce URDF.
+       Sa pose vient dynamiquement du node de calibration (base_link → camera_base)
+       et de son propre robot_state_publisher (driver Kinect). camera_mount (le mât
+       physique) est conservé plus haut pour la collision curobo. -->
 </robot>

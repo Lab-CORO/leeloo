@@ -85,5 +85,17 @@ RUN apt-get update && \
 RUN /bin/bash -c "source /opt/ros/jazzy/setup.bash && \
     colcon build --packages-skip dsr_gazebo2"
 
+# ── RMW : Cyclone DDS (remplace FastDDS) ─────────────────────────────────────
+# Meilleur comportement sur gros messages et configuration bien plus simple que
+# FastDDS. DOIT être identique sur TOUT le graphe ROS (ce conteneur + capacitynet),
+# sinon les nœuds ne se voient pas. ENV s'applique au process principal ET aux
+# shells `docker exec`.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ros-jazzy-rmw-cyclonedds-cpp \
+    && rm -rf /var/lib/apt/lists/*
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ENV ROS_DOMAIN_ID=0
+ENV CYCLONEDDS_URI=/home/ros2_ws/src/capacitynet/config/profile.xml'
+
 ENTRYPOINT ["/docker_entrypoint.sh"]
 CMD ["bash"]
