@@ -72,18 +72,29 @@ def generate_launch_description():
     # curobo_base_link = _kin.get('base_link', 'base_link')
     # curobo_urdf_path = _kin.get('urdf_path', os.path.join(leeloo_share, 'urdf', 'leeloo.urdf'))
 
-    # URDF de la structure (pont mid_mount → … → robot_mount → base_0).
+    # URDF de la structure (pont default_mount → … → robot_mount → dsr01/world).
     # Tous joints fixes → robot_state_publisher publie dans /leeloo/tf_static.
     structure_urdf = os.path.join(leeloo_share, 'urdf', 'leeloo_structure.urdf')
     with open(structure_urdf, 'r') as f:
         structure_description = f.read()
+
+    # URDF combiné (Ridgeback + structure + bras m1013) pour RViz uniquement.
+    # Noms de frames alignés sur l'arbre TF réel /leeloo/tf[_static] (default_mount,
+    # dsr01/world, dsr01/link_1…6) : RobotModel de RViz place chaque lien via un
+    # lookup TF par nom, pas par FK propre — donc ce fichier n'a besoin QUE des bons
+    # noms, pas de valeurs de joint exactes. Caméra volontairement absente (sa pose
+    # est dynamique, cf. kinect_tf_computation_node) : elle ne sera pas rendue en
+    # mesh mais son repère existe déjà dans le TF live.
+    leeloo_combined_urdf = os.path.join(leeloo_share, 'urdf', 'leeloo.urdf')
+    with open(leeloo_combined_urdf, 'r') as f:
+        leeloo_combined_description = f.read()
 
     # ── Groupe "côté Leeloo" : TF redirigés vers /leeloo, données inchangées ──
     leeloo_tf_group = GroupAction([
         SetRemap('/tf',        '/leeloo/tf'),
         SetRemap('/tf_static', '/leeloo/tf_static'),
 
-        # RSP structure : publie mid_mount→structure_base→…→robot_mount→base_0
+        # RSP structure : publie default_mount→structure_base→…→robot_mount→dsr01/world
         # dans /leeloo/tf_static (le maillon manquant entre Ridgeback et bras).
         Node(
             package='robot_state_publisher',
@@ -91,6 +102,25 @@ def generate_launch_description():
             name='structure_state_publisher',
             output='screen',
             parameters=[{'robot_description': structure_description}],
+        ),
+
+        # RSP dédié RViz : publie l'URDF combiné (Ridgeback+structure+bras) sur
+        # /leeloo/robot_description pour que RViz affiche les meshes du robot
+        # entier. Son /tf_static suit le remap ambiant du groupe comme tout le
+        # monde (→ /leeloo/tf_static) : il republie les mêmes fixed joints que
+        # structure_state_publisher/relais (valeurs identiques, doublon inoffensif).
+        # Pas de joint_states reçu (rien ne publie sur /joint_states global) →
+        # aucune TF articulée produite ici, pas de conflit avec les valeurs
+        # dynamiques réelles (bras, roues) qui viennent des vraies sources.
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='leeloo_viz_state_publisher',
+            output='screen',
+            parameters=[{'robot_description': leeloo_combined_description}],
+            remappings=[
+                ('robot_description', '/leeloo/robot_description'),
+            ],
         ),
 
         # Caméra : dsr01/world→camera_base depuis le résultat hand-eye.
@@ -178,6 +208,9 @@ def generate_launch_description():
                     'marker_length':              8.6,
                     'aruco_dictionary_id':        'DICT_APRILTAG_36H11',
                     'camera_frame_id':            'rgb_camera_link',
+                    # Préfixe des TF par marqueur : un TF marker_<id> par ID détecté
+                    # (ex: marker_21 = marqueur de calibration, cf. tracking_marker_frame
+                    # dans le hand_eye_calibration ci-dessous).
                     'marker_frame_id':            'marker',
                     'ignore_marker_ids_array':    17,
                 }]
@@ -196,7 +229,9 @@ def generate_launch_description():
                     'robot_base_frame':        'dsr01/world',
                     'robot_effector_frame':    'dsr01/link_6',
                     'tracking_base_frame':     'rgb_camera_link',
-                    'tracking_marker_frame':   'marker',
+                    # ID 21 = marqueur dédié à la calibration (le markertracker publie
+                    # un TF par ID détecté : marker_<id>, cf. marker_frame_id ci-dessous).
+                    'tracking_marker_frame':   'marker_21',
                 }.items()
             ),
 

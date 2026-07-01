@@ -380,10 +380,15 @@
     <child link="imu_link"/>
     <origin rpy="0 0 0" xyz="0.2085 -0.2902 0.1681"/>
   </joint>
-  <link name="mid_mount"/>
+  <!-- Renommé mid_mount → default_mount pour matcher la frame réellement publiée
+       par le Ridgeback (riser_link → default_mount). ATTENTION : le robot réel a
+       cette frame à z=0.075 (mesuré en TF live), pas 0.06 comme ci-dessous — écart
+       connu de 15mm non corrigé ici (changerait la géométrie de collision curobo,
+       hors périmètre de cette tâche RViz). -->
+  <link name="default_mount"/>
   <joint name="mid_mount_joint" type="fixed">
     <parent link="riser_link"/>
-    <child link="mid_mount"/>
+    <child link="default_mount"/>
     <origin rpy="0 0 0" xyz="0 0 0.06"/>
   </joint>
   <!-- Bring in simulation data for Gazebo. -->
@@ -421,7 +426,7 @@
   </link>
   <joint name="structure_base_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 0"/>
-    <parent link="mid_mount"/>
+    <parent link="default_mount"/>
     <child link="structure_base"/>
     <axis xyz="0 0 0"/>
   </joint>
@@ -627,7 +632,7 @@
   <material name="dr_white">
     <color rgba="0.941 0.941 0.941 1.0"/>
   </material>
-  <link name="base_0">
+  <link name="dsr01/base_link">
     <inertial>
       <mass value="4.12"/>
       <origin xyz="-3.4e-05   -0.004815    0.048482"/>
@@ -648,14 +653,14 @@
   </link>
   <!-- joint 1 -->
   <joint name="joint1" type="revolute">
-    <parent link="base_0"/>
-    <child link="link1"/>
+    <parent link="dsr01/base_link"/>
+    <child link="dsr01/link_1"/>
     <origin rpy="0 0 0" xyz="0 0 0.1525"/>
     <axis xyz="0 0 1"/>
     <limit effort="346" lower="-6.2832" upper="6.2832" velocity="2.0944"/>
     <dynamics friction="0"/>
   </joint>
-  <link name="link1">
+  <link name="dsr01/link_1">
     <inertial>
       <mass value="7.8"/>
       <origin xyz="0.000119      0.0428   -0.006383"/>
@@ -676,14 +681,14 @@
   </link>
   <!-- joint2 -->
   <joint name="joint2" type="revolute">
-    <parent link="link1"/>
-    <child link="link2"/>
+    <parent link="dsr01/link_1"/>
+    <child link="dsr01/link_2"/>
     <origin rpy="0 -1.571 -1.571" xyz="0 0.0345 0"/>
     <axis xyz="0 0 1"/>
     <limit effort="346" lower="-6.2832" upper="6.2832" velocity="2.0944"/>
     <dynamics friction="0"/>
   </joint>
-  <link name="link2">
+  <link name="dsr01/link_2">
     <inertial>
       <mass value="10.83"/>
       <origin xyz="0.25973    -5.3e-05     0.15782"/>
@@ -728,14 +733,14 @@
   </link>
   <!-- joint3 -->
   <joint name="joint3" type="revolute">
-    <parent link="link2"/>
-    <child link="link3"/>
+    <parent link="dsr01/link_2"/>
+    <child link="dsr01/link_3"/>
     <origin rpy="0 0 1.571" xyz="0.62 0 0"/>
     <axis xyz="0 0 1"/>
     <limit effort="163" lower="-2.35619" upper="2.35619" velocity="3.1416"/>
     <dynamics friction="0"/>
   </joint>
-  <link name="link3">
+  <link name="dsr01/link_3">
     <inertial>
       <mass value="3.68"/>
       <origin xyz="-1.5e-05   -0.006702    0.044608"/>
@@ -756,14 +761,14 @@
   </link>
   <!-- joint4 -->
   <joint name="joint4" type="revolute">
-    <parent link="link3"/>
-    <child link="link4"/>
+    <parent link="dsr01/link_3"/>
+    <child link="dsr01/link_4"/>
     <origin rpy="1.571 0 0" xyz="0 -0.559 0"/>
     <axis xyz="0 0 1"/>
     <limit effort="50" lower="-6.2832" upper="6.2832" velocity="3.927"/>
     <dynamics friction="0"/>
   </joint>
-  <link name="link4">
+  <link name="dsr01/link_4">
     <inertial>
       <mass value="3.82"/>
       <origin xyz="7.1e-05    0.091879    -0.18252"/>
@@ -796,14 +801,14 @@
   </link>
   <!-- joint5 -->
   <joint name="joint5" type="revolute">
-    <parent link="link4"/>
-    <child link="link5"/>
+    <parent link="dsr01/link_4"/>
+    <child link="dsr01/link_5"/>
     <origin rpy="-1.571 0 0" xyz="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit effort="50" lower="-2.35619" upper="2.35619" velocity="3.927"/>
     <dynamics friction="0"/>
   </joint>
-  <link name="link5">
+  <link name="dsr01/link_5">
     <inertial>
       <mass value="2.82"/>
       <origin xyz="-0.000273    0.003651    0.032088"/>
@@ -824,14 +829,14 @@
   </link>
   <!-- joint6 -->
   <joint name="joint6" type="revolute">
-    <parent link="link5"/>
-    <child link="link6"/>
+    <parent link="dsr01/link_5"/>
+    <child link="dsr01/link_6"/>
     <origin rpy="1.571 0 0" xyz="0 -0.121 0"/>
     <axis xyz="0 0 1"/>
     <limit effort="50" lower="-6.2832" upper="6.2832" velocity="3.927"/>
     <dynamics friction="0"/>
   </joint>
-  <link name="link6">
+  <link name="dsr01/link_6">
     <inertial>
       <mass value="1.16"/>
       <origin xyz="-0.000292       7e-06     -0.0539"/>
@@ -850,10 +855,21 @@
       </geometry>
     </visual>
   </link>
-  <!-- Connect m1013 robot arm to ridgeback base -->
+  <!-- Connect m1013 robot arm to ridgeback base.
+       dsr01/world est un maillon intermédiaire identité, présent car le driver
+       Doosan réel publie lui-même dsr01/world → dsr01/base_link (frame_prefix
+       dsr01/). Noms alignés sur l'arbre TF réel /leeloo/tf[_static] pour que ce
+       robot_description reste utilisable tel quel par RViz (RobotModel place
+       chaque lien via TF, pas par FK interne : les noms doivent matcher). -->
+  <link name="dsr01/world"/>
   <joint name="arm_mount_joint" type="fixed">
     <parent link="robot_mount"/>
-    <child link="base_0"/>
+    <child link="dsr01/world"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+  <joint name="dsr01_base_link_joint" type="fixed">
+    <parent link="dsr01/world"/>
+    <child link="dsr01/base_link"/>
     <origin rpy="0 0 0" xyz="0 0 0"/>
   </joint>
   <!-- NOTE: la caméra Azure Kinect (camera_base/body/visor) n'est PLUS dans ce URDF.
