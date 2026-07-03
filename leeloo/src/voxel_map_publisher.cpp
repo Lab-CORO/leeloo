@@ -24,7 +24,7 @@ public:
 
     // Sparse topic subscriber — primary benchmarking path (Tier 2).
     sparse_sub_ = create_subscription<curobo_msgs::msg::SparseVoxelGrid>(
-      "/unified_planner/voxel_grid_sparse",
+      "/curobo_trajectory_planner/voxel_grid_sparse",
       rclcpp::QoS(10),
       [this](curobo_msgs::msg::SparseVoxelGrid::ConstSharedPtr msg) {
         on_sparse_message(msg);

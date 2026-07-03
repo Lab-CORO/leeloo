@@ -7,7 +7,10 @@ ExecuteTrajectoryNode::ExecuteTrajectoryNode() : Node("ExecuteTrajectory")
     // {trajectory_msgs/msg/JointTrajectory
     subscription_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>("/leeloo/execute_trajectory", 10, std::bind(&ExecuteTrajectoryNode::sub_trajectory, this, std::placeholders::_1));   
     state_publisher_  = this->create_publisher<std_msgs::msg::Float32>("/leeloo/trajectory_state",10); // give a percentage of the advencement
-    dsr_publisher_ = this->create_publisher<dsr_msgs2::msg::SpeedjRtStream>("/dsr01/speedj_rt_stream",10);
+    // Le driver Doosan (dsr_controller2) souscrit à <node_name>/speedj_rt_stream,
+    // soit /dsr01/dsr_controller2/speedj_rt_stream (svc_prefix_ = get_name()+"/").
+    // Publier sur /dsr01/speedj_rt_stream ne touche personne (0 subscriber).
+    dsr_publisher_ = this->create_publisher<dsr_msgs2::msg::SpeedjRtStream>("/dsr01/dsr_controller2/speedj_rt_stream",10);
     timer_ = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&ExecuteTrajectoryNode::speed_rt_stream_timer, this));
 }
 
