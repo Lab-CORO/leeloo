@@ -65,12 +65,13 @@ def generate_launch_description():
 
     # CuRobo config — read base_link and urdf_path from the YAML so they stay
     # consistent with what the planner reads at runtime (single source of truth).
-    # leeloo_curobo_config = os.path.join(leeloo_share, 'config', 'leeloo_curobo.yaml')
-    # with open(leeloo_curobo_config, 'r') as f:
-    #     _cfg = yaml.safe_load(f)
-    # _kin = _cfg.get('robot_cfg', {}).get('kinematics', {})
-    # curobo_base_link = _kin.get('base_link', 'base_link')
-    # curobo_urdf_path = _kin.get('urdf_path', os.path.join(leeloo_share, 'urdf', 'leeloo.urdf'))
+    leeloo_curobo_config = os.path.join(leeloo_share, 'config', 'leeloo_curobo.yaml')
+    leeloo_urdf = os.path.join(leeloo_share, 'urdf', 'leeloo.urdf')
+    with open(leeloo_curobo_config, 'r') as f:
+        _cfg = yaml.safe_load(f)
+    _kin = _cfg.get('robot_cfg', {}).get('kinematics', {})
+    curobo_base_link = _kin.get('base_link', 'base_link')
+    curobo_urdf_path = _kin.get('urdf_path', os.path.join(leeloo_share, 'urdf', 'leeloo.urdf'))
 
     # URDF de la structure (pont default_mount → … → robot_mount → dsr01/world).
     # Tous joints fixes → robot_state_publisher publie dans /leeloo/tf_static.
@@ -88,6 +89,13 @@ def generate_launch_description():
     leeloo_combined_urdf = os.path.join(leeloo_share, 'urdf', 'leeloo.urdf')
     with open(leeloo_combined_urdf, 'r') as f:
         leeloo_combined_description = f.read()
+
+    # Gripper Robotiq 2F-85 : ros2_control_node a besoin du <ros2_control> ajouté
+    # dans leeloo.urdf (driver réel, COM_port /dev/ttyUSB0) → on lui passe le même
+    # robot_description que leeloo_viz_state_publisher, pas de fichier séparé.
+    robotiq_description_share = get_package_share_directory('robotiq_description')
+    gripper_controllers_file = os.path.join(robotiq_description_share, 'config', 'robotiq_controllers.yaml')
+    gripper_update_rate_file = os.path.join(robotiq_description_share, 'config', 'robotiq_update_rate.yaml')
 
     # ── Groupe "côté Leeloo" : TF redirigés vers /leeloo, données inchangées ──
     leeloo_tf_group = GroupAction([
@@ -123,6 +131,45 @@ def generate_launch_description():
             ],
         ),
 
+        # Gripper Robotiq 2F-85 — équivalent de
+        # `ros2 launch robotiq_description robotiq_control.launch.py`, sans les
+        # nodes de description (pas de robot_state_publisher ni rviz : le TF du
+        # gripper vient déjà de leeloo_viz_state_publisher ci-dessus).
+        # ros2_control_node ignore le paramètre 'robot_description' et s'abonne
+        # toujours au TOPIC 'robot_description' — remappé ici vers
+        # /leeloo/robot_description (publié par leeloo_viz_state_publisher,
+        # seul RSP dont l'URDF contient le tag <ros2_control> du gripper).
+        # Sans ce remap il reçoit le /robot_description global, qui est celui
+        # de structure_state_publisher (leeloo_structure.urdf, sans gripper) →
+        # crash "no 'ros2_control' tag found in the URDF".
+        Node(
+            package='controller_manager',
+            executable='ros2_control_node',
+            output='screen',
+            parameters=[
+                gripper_update_rate_file,
+                gripper_controllers_file,
+            ],
+            remappings=[
+                ('robot_description', '/leeloo/robot_description'),
+            ],
+        ),
+        Node(
+            package='controller_manager',
+            executable='spawner',
+            arguments=['joint_state_broadcaster', '-c', '/controller_manager'],
+        ),
+        Node(
+            package='controller_manager',
+            executable='spawner',
+            arguments=['robotiq_gripper_controller', '-c', '/controller_manager'],
+        ),
+        Node(
+            package='controller_manager',
+            executable='spawner',
+            arguments=['robotiq_activation_controller', '-c', '/controller_manager'],
+        ),
+
         # Caméra : dsr01/world→camera_base depuis le résultat hand-eye.
         # Ancrée sur la racine du bras Doosan (frame_prefix dsr01/) → caméra et
         # bras partagent dsr01/world, indépendamment du Ridgeback.
@@ -151,7 +198,9 @@ def generate_launch_description():
             respawn=True,
             respawn_delay=5.0,
             parameters=[{
-                # 'robot_config_file': leeloo_curobo_config,
+                'robot_config_file': leeloo_curobo_config,
+                'urdf_path': leeloo_urdf,
+                'interpolation_dt': 0.03,
                 'cameras_config_file': LaunchConfiguration('cameras_config_file'),
                 'base_link': "dsr01/world",
                 'world_file': LaunchConfiguration('world_file'),
@@ -163,16 +212,13 @@ def generate_launch_description():
                 # Must match the Azure Kinect depth_to_rgb output (1280x720).
                 'mapper_image_width': 1280,
                 'mapper_image_height': 720,
+                'mpc_solver_type': 'mppi_acceleration',
+                'mpc_warm_start_iters': 2 ,
+                'mpc_cold_start_iters': 10,
                 # Sparse voxel topic publish rate (Hz); <= 0 disables it.
-                'sparse_voxel_publish_rate': 7.0,
-                # GPU rasterization of analytic primitives is disabled at startup
-                # to avoid NVRTC kernel compilation (~90 s warmup).
-                # Enable at runtime: ros2 param set /curobo_trajectory_planner
-                #                    enable_primitives_rasterization true
-                'enable_primitives_rasterization': True,
+                'sparse_voxel_publish_rate': 5.0,
             }],
         ),
-
         Node(
             package='curobo_ros',
             executable='robot_segmentation',
@@ -181,6 +227,8 @@ def generate_launch_description():
             respawn_delay=2.0,
             parameters=[{
                 'robot_base_frame': 'dsr01/world',
+                'robot_config_file': leeloo_curobo_config,
+                'urdf_path': leeloo_urdf,
             }],
         ),
 
@@ -205,7 +253,7 @@ def generate_launch_description():
                     'input_image_topic':          '/rgb/image_raw',
                     'publish_topic_image_result': True,
                     'camera_info_topic':          '/rgb/camera_info',
-                    'marker_length':              8.6,
+                    'marker_length':              5.7,
                     'aruco_dictionary_id':        'DICT_APRILTAG_36H11',
                     'camera_frame_id':            'rgb_camera_link',
                     # Préfixe des TF par marqueur : un TF marker_<id> par ID détecté

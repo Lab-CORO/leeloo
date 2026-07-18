@@ -29,12 +29,12 @@ public:
       [this](curobo_msgs::msg::SparseVoxelGrid::ConstSharedPtr msg) {
         on_sparse_message(msg);
       });
-    RCLCPP_INFO(get_logger(), "Subscribed to /unified_planner/voxel_grid_sparse");
+    RCLCPP_INFO(get_logger(), "Subscribed to /curobo_trajectory_planner/voxel_grid_sparse");
 
     // Legacy service path — optional, for comparison against Tier 1 numbers.
     if (get_parameter("use_service").as_bool()) {
-      client_ = create_client<curobo_msgs::srv::GetVoxelGrid>("/unified_planner/get_voxel_grid");
-      RCLCPP_INFO(get_logger(), "Waiting for /unified_planner/get_voxel_grid ...");
+      client_ = create_client<curobo_msgs::srv::GetVoxelGrid>("/curobo_trajectory_planner/get_voxel_grid");
+      RCLCPP_INFO(get_logger(), "Waiting for /curobo_trajectory_planner/get_voxel_grid ...");
       client_->wait_for_service();
       RCLCPP_INFO(get_logger(), "Service ready — also polling at %.1f Hz.",
                   get_parameter("rate_hz").as_double());

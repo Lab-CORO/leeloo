@@ -36,6 +36,9 @@ endif()
 add_executable(execute_trajectory src/execute_trajectory.cpp)
 ament_target_dependencies(execute_trajectory rclcpp std_msgs dsr_msgs2 trajectory_msgs)
 
+add_executable(ridgeback_control src/ridgeback_control.cpp)
+ament_target_dependencies(ridgeback_control rclcpp std_msgs geometry_msgs)
+
 add_executable(voxel_map_publisher src/voxel_map_publisher.cpp)
 ament_target_dependencies(voxel_map_publisher rclcpp visualization_msgs geometry_msgs curobo_msgs)
 
@@ -60,9 +63,13 @@ install(DIRECTORY urdf
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
+)
 
 install(TARGETS
   execute_trajectory
+  ridgeback_control
   voxel_map_publisher
   DESTINATION lib/${PROJECT_NAME}
 )

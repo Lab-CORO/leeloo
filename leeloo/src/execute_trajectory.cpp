@@ -11,7 +11,7 @@ ExecuteTrajectoryNode::ExecuteTrajectoryNode() : Node("ExecuteTrajectory")
     // soit /dsr01/dsr_controller2/speedj_rt_stream (svc_prefix_ = get_name()+"/").
     // Publier sur /dsr01/speedj_rt_stream ne touche personne (0 subscriber).
     dsr_publisher_ = this->create_publisher<dsr_msgs2::msg::SpeedjRtStream>("/dsr01/dsr_controller2/speedj_rt_stream",10);
-    timer_ = this->create_wall_timer(std::chrono::milliseconds(20), std::bind(&ExecuteTrajectoryNode::speed_rt_stream_timer, this));
+    timer_ = this->create_wall_timer(std::chrono::milliseconds(30), std::bind(&ExecuteTrajectoryNode::speed_rt_stream_timer, this));
 }
 
 ExecuteTrajectoryNode::~ExecuteTrajectoryNode()
@@ -28,7 +28,7 @@ void ExecuteTrajectoryNode::speed_rt_stream_timer(){
         // } else {
             // RCLCPP_WARN(this->get_logger(), "Received fewer than 6 velocity values.");
         // }
-        this->msg_speed.time = 0.02; 
+        this->msg_speed.time = 0.03; 
 
         
     // send traj to dsr 
