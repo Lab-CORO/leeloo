@@ -1,0 +1,79 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    # Arm, VELOCITY path — this is the one that mirrors the real robot: curobo
+    # streams a JointTrajectory to leeloo's execute_trajectory, which emits
+    # dsr_msgs2/SpeedjRtStream, which dsr_sim_bridge turns into velocity
+    # commands here. Active by default.
+    arm_velocity_controller:
+      type: forward_command_controller/ForwardCommandController
+
+    # Arm, POSITION path — kept only for standalone tests without curobo
+    # (a plain follow_joint_trajectory goal). Spawned INACTIVE: it claims the
+    # same joints as arm_velocity_controller, so the two can never be active
+    # together.
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    # Same controller name AND type as the real robot
+    # (robotiq_description/config/robotiq_controllers.yaml), so leeloo's grasp
+    # node reaches /robotiq_gripper_controller/gripper_cmd unchanged.
+    # robotiq_activation_controller is deliberately absent: it drives the real
+    # 2F-85's activation sequence over serial and has no meaning in sim.
+    robotiq_gripper_controller:
+      type: parallel_gripper_action_controller/GripperActionController
+
+arm_velocity_controller:
+  ros__parameters:
+    joints:
+      - joint1
+      - joint2
+      - joint3
+      - joint4
+      - joint5
+      - joint6
+    interface_name: velocity
+
+arm_controller:
+  ros__parameters:
+    joints:
+      - joint1
+      - joint2
+      - joint3
+      - joint4
+      - joint5
+      - joint6
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+
+robotiq_gripper_controller:
+  ros__parameters:
+    joint: robotiq_85_left_knuckle_joint
+    # No max_effort_interface/max_velocity_interface: the real Robotiq driver is
+    # position-only and the sim hardware mirrors that, so the controller must
+    # not try to claim interfaces the hardware does not export.
+    state_interfaces:
+      - position
+      - velocity
+    allow_stalling: true
+    stall_timeout: 0.05
+    goal_tolerance: 0.02
+
+# The base (Ridgeback, holonomic/mecanum) is NOT driven through
+# ros2_control/controller_manager — see leeloo_gazebo.launch.py's module
+# docstring. It's driven by Gazebo's own kinematic MecanumDrive system
+# plugin, declared directly in the sim robot_description and fed through
+# base_sim_bridge + ros_gz_bridge.
+#
+# /dsr01/joint_states is NOT a second joint_state_broadcaster instance either:
+# in Jazzy the broadcaster always publishes to <cm_namespace>/joint_states with
+# no way to relocate it, so two instances would collide on /joint_states.
+# dsr_sim_bridge republishes the 6 arm joints instead, which is also what the
+# real Doosan driver does (it publishes only its own joints).

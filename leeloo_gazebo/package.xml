@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>leeloo_gazebo</name>
+  <version>0.0.0</version>
+  <description>Simulated Leeloo hardware in Gazebo Sim (Ridgeback + Doosan M1013 + Robotiq 85 + depth cameras), built from leeloo's URDF. Exposes the same topics and types as the real drivers so curobo_ros, execute_trajectory, ridgeback_control and robot_segmentation run unmodified: arm in velocity via a simulated speedj stream, holonomic base via Gazebo's MecanumDrive plugin, and simulated Kinect/OAK-D depth cameras feeding curobo's ESDF. Does not modify the leeloo package.</description>
+  <maintainer email="guillaume.dupoiron@gmail.com">coro</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+  <!-- leeloo.urdf + its meshes/robotiq_description meshes, and leeloo's own
+       ridgeback_control node when launched standalone -->
+  <exec_depend>leeloo</exec_depend>
+  <exec_depend>robotiq_description</exec_depend>
+
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>gz_ros2_control</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>joint_trajectory_controller</exec_depend>
+  <!-- arm_velocity_controller (ForwardCommandController) and the gripper's
+       parallel_gripper_action_controller/GripperActionController -->
+  <exec_depend>forward_command_controller</exec_depend>
+  <exec_depend>parallel_gripper_controller</exec_depend>
+
+  <!-- dsr_sim_bridge stands in for dsr_controller2, so it consumes the real
+       driver's message type -->
+  <exec_depend>dsr_msgs2</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <!-- ros_gz_bridge topics for the base's Gazebo-native MecanumDrive plugin
+       and the simulated depth cameras -->
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>tf2_msgs</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
