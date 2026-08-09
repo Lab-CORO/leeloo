@@ -1,0 +1,698 @@
+Panels:
+  - Class: rviz_common/Displays
+    Help Height: 78
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Status1
+        - /DepthCloud1/Auto Size1
+      Splitter Ratio: 0.5
+    Tree Height: 282
+  - Class: rviz_common/Selection
+    Name: Selection
+  - Class: rviz_common/Tool Properties
+    Expanded:
+      - /2D Goal Pose1
+      - /Publish Point1
+    Name: Tool Properties
+    Splitter Ratio: 0.5886790156364441
+  - Class: rviz_common/Views
+    Expanded:
+      - /Current View1
+    Name: Views
+    Splitter Ratio: 0.5
+  - Class: rviz_common/Time
+    Experimental: false
+    Name: Time
+    SyncMode: 0
+    SyncSource: DepthCloud
+  - Class: curobo_rviz/RvizArgsPanel
+    Name: RvizArgsPanel
+    time_dilation_factor: 1
+    voxel_size: 0
+  - Class: add_objects_panel/AddObjectsPanel
+    Name: AddObjectsPanel
+  - Class: trajectory_preview/TrajectoryPreviewPanel
+    Name: TrajectoryPreviewPanel
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 10
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/RobotModel
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /leeloo/robot_description
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        axle_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_mount:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        chassis_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        controler:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        default_mount:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        dsr01/base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        dsr01/link_1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        dsr01/link_2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        dsr01/link_3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        dsr01/link_4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        dsr01/link_5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        dsr01/link_6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        dsr01/world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        front_cover_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_lights_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_plate:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_right_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_rocker_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_structure:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        imu_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        left_side_cover_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_cover_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_lights_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_plate:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_right_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_rocker_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_strucuture:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_side_cover_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        riser_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        robot_mount:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        structure_base:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        top_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+      Mass Properties:
+        Inertia: false
+        Mass: false
+      Name: RobotModel (real)
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+    - Alpha: 0.6000000238418579
+      Class: rviz_default_plugins/RobotModel
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /preview/robot_description
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        base_0:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+      Mass Properties:
+        Inertia: false
+        Mass: false
+      Name: Trajectory preview (ghost)
+      TF Prefix: preview
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+        axle_link:
+          Value: true
+        base_link:
+          Value: true
+        camera_base:
+          Value: true
+        camera_body:
+          Value: true
+        camera_mount:
+          Value: true
+        camera_visor:
+          Value: true
+        chassis_link:
+          Value: true
+        controler:
+          Value: true
+        default_mount:
+          Value: true
+        depth_camera_link:
+          Value: true
+        dsr01/base_link:
+          Value: true
+        dsr01/link_1:
+          Value: true
+        dsr01/link_2:
+          Value: true
+        dsr01/link_3:
+          Value: true
+        dsr01/link_4:
+          Value: true
+        dsr01/link_5:
+          Value: true
+        dsr01/link_6:
+          Value: true
+        dsr01/world:
+          Value: true
+        front_cover_link:
+          Value: true
+        front_left_wheel_link:
+          Value: true
+        front_lights_link:
+          Value: true
+        front_plate:
+          Value: true
+        front_right_wheel_link:
+          Value: true
+        front_rocker_link:
+          Value: true
+        front_structure:
+          Value: true
+        imu_0_link:
+          Value: true
+        imu_link:
+          Value: true
+        left_side_cover_link:
+          Value: true
+        lidar2d_0_laser:
+          Value: true
+        lidar2d_0_link:
+          Value: true
+        odom:
+          Value: true
+        preview/base_0:
+          Value: true
+        preview/link1:
+          Value: true
+        preview/link2:
+          Value: true
+        preview/link3:
+          Value: true
+        preview/link4:
+          Value: true
+        preview/link5:
+          Value: true
+        preview/link6:
+          Value: true
+        rear_cover_link:
+          Value: true
+        rear_left_wheel_link:
+          Value: true
+        rear_lights_link:
+          Value: true
+        rear_plate:
+          Value: true
+        rear_right_wheel_link:
+          Value: true
+        rear_rocker_link:
+          Value: true
+        rear_strucuture:
+          Value: true
+        rgb_camera_link:
+          Value: true
+        right_side_cover_link:
+          Value: true
+        riser_link:
+          Value: true
+        robot_mount:
+          Value: true
+        structure_base:
+          Value: true
+        top_link:
+          Value: true
+      Marker Scale: 0.30000001192092896
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+      Tree:
+        odom:
+          base_link:
+            chassis_link:
+              axle_link:
+                front_rocker_link:
+                  front_left_wheel_link:
+                    {}
+                  front_right_wheel_link:
+                    {}
+                rear_rocker_link:
+                  rear_left_wheel_link:
+                    {}
+                  rear_right_wheel_link:
+                    {}
+              front_cover_link:
+                {}
+              front_lights_link:
+                {}
+              imu_link:
+                {}
+              left_side_cover_link:
+                {}
+              lidar2d_0_link:
+                lidar2d_0_laser:
+                  {}
+              rear_cover_link:
+                {}
+              rear_lights_link:
+                {}
+              right_side_cover_link:
+                {}
+              riser_link:
+                default_mount:
+                  structure_base:
+                    camera_mount:
+                      {}
+                    front_plate:
+                      front_structure:
+                        robot_mount:
+                          dsr01/world:
+                            camera_base:
+                              camera_body:
+                                {}
+                              camera_visor:
+                                {}
+                              depth_camera_link:
+                                rgb_camera_link:
+                                  {}
+                            dsr01/base_link:
+                              dsr01/link_1:
+                                dsr01/link_2:
+                                  dsr01/link_3:
+                                    dsr01/link_4:
+                                      dsr01/link_5:
+                                        dsr01/link_6:
+                                          {}
+                              preview/base_0:
+                                preview/link1:
+                                  preview/link2:
+                                    preview/link3:
+                                      preview/link4:
+                                        preview/link5:
+                                          preview/link6:
+                                            {}
+                    rear_plate:
+                      rear_strucuture:
+                        controler:
+                          {}
+                top_link:
+                  {}
+          imu_0_link:
+            {}
+      Update Interval: 0
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Collision spheres
+      Namespaces:
+        "": true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /collision_spheres
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Planner collision spheres
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /curobo_trajectory_planner/collision_spheres
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Visualization markers
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /visualization_markers
+      Value: true
+    - Class: curobo_rviz/ArrowInteractionDisplay
+      Enabled: true
+      Name: Arm goal arrow
+      Reference Frame: dsr01/base_link
+      Value: true
+      Visible: true
+    - Class: rviz_default_plugins/InteractiveMarkers
+      Enable Transparency: true
+      Enabled: true
+      Interactive Markers Namespace: /simple_marker
+      Name: Arm goal marker
+      Show Axes: false
+      Show Descriptions: true
+      Show Visual Aids: false
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Voxel grid
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /visualise_voxel_grid_array
+      Value: true
+    - Alpha: 1
+      Auto Size:
+        Auto Size Factor: 1
+        Value: true
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      CameraInfo Topic: /depth_to_rgb/camera_info
+      Channel Name: intensity
+      Class: rviz_default_plugins/DepthCloud
+      Color: 255; 255; 255
+      Color Image Topic: ""
+      Color Transformer: RGB8
+      Color Transport Hint: raw
+      Decay Time: 0
+      Depth Map Topic: /depth_to_rgb/image_raw
+      Depth Map Transport Hint: raw
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: DepthCloud
+      Occlusion Compensation:
+        Occlusion Time-Out: 30
+        Value: false
+      Position Transformer: XYZ
+      Queue Size: 5
+      Reliability Policy: Best effort
+      Selectable: true
+      Size (Pixels): 3
+      Style: Flat Squares
+      Topic Filter: true
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: dsr01/world
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+      Line color: 128; 128; 0
+    - Class: rviz_default_plugins/SetInitialPose
+      Covariance x: 0.25
+      Covariance y: 0.25
+      Covariance yaw: 0.06853891909122467
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /initialpose
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /goal_pose
+    - Class: rviz_default_plugins/PublishPoint
+      Single click: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /clicked_point
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 2.583608627319336
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 0.6208524107933044
+        Y: 0.22845754027366638
+        Z: 0.2883892059326172
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 0.41020309925079346
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz)
+      Yaw: 1.4422273635864258
+    Saved: ~
+Window Geometry:
+  AddObjectsPanel:
+    collapsed: false
+  Displays:
+    collapsed: false
+  Height: 1131
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd0000000400000000000001e8000003c9fc020000000bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005d00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003f000001a8000000cc00fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb00000026005200760069007a00500075007300680042007500740074006f006e00500061006e0065006c010000026d000000820000000000000000fc000001ed000001a9000000360100001efa000000000100000002fb0000001a005200760069007a004100720067007300500061006e0065006c0100000000000003120000009400fffffffb0000001e004100640064004f0062006a006500630074007300500061006e0065006c0100000000ffffffff000000a900fffffffb0000002c005400720061006a006500630074006f00720079005000720065007600690065007700500061006e0065006c010000039c0000006c0000006c00ffffff000000010000010f000003c9fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003f000003c9000000a900fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000072e0000003efc0100000002fb0000000800540069006d006501000000000000072e0000026f00fffffffb0000000800540069006d006501000000000000045000000000000000000000042b000003c900000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  RvizArgsPanel:
+    collapsed: false
+  Selection:
+    collapsed: false
+  Time:
+    collapsed: false
+  Tool Properties:
+    collapsed: false
+  TrajectoryPreviewPanel:
+    collapsed: false
+  Views:
+    collapsed: false
+  Width: 1838
+  X: 82
+  Y: 32

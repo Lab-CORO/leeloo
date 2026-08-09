@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>leeloo_rviz</name>
+  <version>0.0.0</version>
+  <description>
+    RViz2 visualization and interaction session for the leeloo robot (Doosan m1013
+    arm + Clearpath r100 mobile base + Azure Kinect). Launch-only: assembles one
+    coherent RViz view (robot model, unified /leeloo TF tree, cameras, cuRobo
+    collision spheres, cuRobo/trajectory panels) plus a "ghost" preview robot that
+    replays planned trajectories. Attaches to an already-running robot bringup; it
+    launches no drivers.
+  </description>
+  <maintainer email="guillaume.dupoiron@protonmail.com">coro</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- RViz core + standard displays -->
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>rviz_common</exec_depend>
+  <exec_depend>rviz_default_plugins</exec_depend>
+
+  <!-- Reused RViz panels/displays -->
+  <exec_depend>curobo_robot_setup</exec_depend>
+  <exec_depend>curobo_rviz</exec_depend>
+  <exec_depend>trajectory_preview</exec_depend>
+
+  <!-- Ghost preview pipeline -->
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <!-- Ghost arm URDF uses joint1..6 (matches /trajectory); meshes come from urdf_visualizer -->
+  <exec_depend>urdf_visualizer</exec_depend>
+
+  <!-- Camera image transports (compressed feeds) -->
+  <exec_depend>image_transport</exec_depend>
+  <exec_depend>compressed_image_transport</exec_depend>
+  <exec_depend>interactive_markers</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
