@@ -5,30 +5,61 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 import os
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 
 
 def generate_launch_description():
     kinect_driver_share = get_package_share_directory('azure_kinect_ros_driver')
-    oak_driver_share    = get_package_share_directory('depthai_ros_driver_v3')
     leeloo_share        = get_package_share_directory('leeloo')
 
     kinect_launch_file = os.path.join(kinect_driver_share, 'launch', 'driver.launch.py')
-    oak_launch_file     = os.path.join(oak_driver_share,    'launch', 'sr_rgbd_pcl.launch.py')
+
+    # Le driver OAK est résolu de façon TOLÉRANTE : sa résolution était
+    # inconditionnelle et faisait échouer tout le bringup avec PackageNotFoundError
+    # quand depthai_ros_driver_v3 n'est pas installé — y compris en sim:=true, où
+    # ce driver n'est jamais lancé (les images viennent des capteurs Gazebo).
+    # Absent → le bloc OAK n'est simplement pas ajouté ; en réel avec 'oak' dans
+    # enabled_cameras, l'avertissement ci-dessous dit quoi installer.
+    try:
+        oak_driver_share = get_package_share_directory('depthai_ros_driver_v3')
+        oak_launch_file  = os.path.join(oak_driver_share, 'launch', 'sr_rgbd_pcl.launch.py')
+        _oak_available   = True
+    except PackageNotFoundError:
+        _oak_available = False
+        # Chemin factice : PythonLaunchDescriptionSource ne touche au fichier qu'à
+        # l'évaluation, et la condition _oak_enabled ci-dessous est forcée à False
+        # dans ce cas — il n'est donc jamais lu.
+        oak_launch_file = os.path.join(leeloo_share, 'launch', '_oak_driver_absent.launch.py')
+        print("[cameras.launch] depthai_ros_driver_v3 introuvable — la caméra OAK-D "
+              "ne sera pas lancée (sans effet en sim:=true, où leeloo_gazebo publie "
+              "/oak/stereo/* depuis Gazebo).")
 
     # Liste de caméras à activer, séparées par des virgules (ex: 'kinect',
     # 'oak', 'kinect,oak'). Une liste plutôt qu'une énumération figée à 2 noms :
     # une 3e caméra n'a qu'à ajouter son propre nom + sa propre condition
     # ci-dessous, sans toucher au mécanisme de sélection.
+    #
+    # `and not sim` : en simulation les images de profondeur viennent des
+    # capteurs Gazebo de leeloo_gazebo, sur EXACTEMENT les mêmes topics
+    # (/depth_to_rgb/*, /oak/stereo/*). Lancer les drivers en plus ferait deux
+    # publishers concurrents sur ces topics — et ils échoueraient de toute façon,
+    # faute de matériel USB.
     _kinect_enabled = IfCondition(PythonExpression(
-        ["'kinect' in '", LaunchConfiguration('enabled_cameras'), "'.split(',')"]))
+        ["'kinect' in '", LaunchConfiguration('enabled_cameras'), "'.split(',')",
+         " and not '", LaunchConfiguration('sim'), "'.lower() in ('true', '1')"]))
     _oak_enabled = IfCondition(PythonExpression(
-        ["'oak' in '", LaunchConfiguration('enabled_cameras'), "'.split(',')"]))
+        ["'oak' in '", LaunchConfiguration('enabled_cameras'), "'.split(',')",
+         " and not '", LaunchConfiguration('sim'), "'.lower() in ('true', '1')",
+         f" and {_oak_available}"]))
 
     return LaunchDescription([
         DeclareLaunchArgument(
             'enabled_cameras', default_value='kinect,oak',
             description="Caméras à lancer, séparées par des virgules (ex: 'kinect', 'oak', 'kinect,oak')."),
+
+        # En simulation, aucun driver caméra n'est lancé : leeloo_gazebo publie
+        # sur les mêmes topics depuis des capteurs Gazebo.
+        DeclareLaunchArgument('sim', default_value='false'),
 
         # ── k4a GPU depth engine ───────────────────────────────────────────────
         # libdepthengine.so uses OpenGL compute shaders for depth processing.

@@ -25,9 +25,20 @@ def generate_launch_description():
     leeloo_share = get_package_share_directory('leeloo')
 
     # Même liste que cameras.launch.py : la TF de la Kinect n'a de sens que si
-    # son driver tourne.
+    # son driver tourne. `and not sim` : en simulation la pose de la Kinect est
+    # NOMINALE (lien fixe sur camera_mount dans la description de leeloo_gazebo,
+    # publié par son RSP), il n'y a pas de résultat de calibration à rejouer.
     _kinect_enabled = IfCondition(PythonExpression(
-        ["'kinect' in '", LaunchConfiguration('enabled_cameras'), "'.split(',')"]))
+        ["'kinect' in '", LaunchConfiguration('enabled_cameras'), "'.split(',')",
+         " and not '", LaunchConfiguration('sim'), "'.lower() in ('true', '1')"]))
+
+    # leeloo_viz_state_publisher : remplacé en sim par le RSP de leeloo_gazebo,
+    # qui publie une description SURENSEMBLE de leeloo.urdf (mêmes frames, plus
+    # les liens caméra et les blocs sim). Deux RSP sur le même arbre
+    # produiraient des transformes statiques dupliquées et deux publishers
+    # concurrents sur /leeloo/robot_description.
+    _not_sim = IfCondition(PythonExpression(
+        ["not '", LaunchConfiguration('sim'), "'.lower() in ('true', '1')"]))
 
     # URDF de la structure (pont default_mount → … → robot_mount → dsr01/world).
     # Tous joints fixes → robot_state_publisher publie dans /leeloo/tf_static.
@@ -52,6 +63,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'enabled_cameras', default_value='kinect,oak',
             description="Caméras à lancer, séparées par des virgules (ex: 'kinect', 'oak', 'kinect,oak')."),
+        DeclareLaunchArgument('sim', default_value='false'),
 
         # ── Relais TF : ramènent les arbres externes/globaux vers /leeloo ──────
         # Ridgeback (autre machine, namespace /r100_0597).
@@ -100,6 +112,7 @@ def generate_launch_description():
                 executable='robot_state_publisher',
                 name='leeloo_viz_state_publisher',
                 output='screen',
+                condition=_not_sim,
                 parameters=[{'robot_description': leeloo_combined_description}],
                 remappings=[
                     ('robot_description', '/leeloo/robot_description'),

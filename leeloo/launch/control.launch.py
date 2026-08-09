@@ -1,7 +1,8 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, GroupAction
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, EnvironmentVariable
+from launch.substitutions import LaunchConfiguration, EnvironmentVariable, PythonExpression
 from launch_ros.actions import Node, SetRemap
 from launch_ros.parameter_descriptions import ParameterValue
 import os
@@ -79,7 +80,28 @@ def generate_launch_description():
             EnvironmentVariable('LD_LIBRARY_PATH', default_value=''),
         ]
 
+    # ── Mode simulation ────────────────────────────────────────────────────────
+    # sim:=true débranche uniquement le MATÉRIEL : dsr_bringup2 (driver Doosan)
+    # et le ros2_control_node de la pince réelle (RobotiqGripperHardwareInterface
+    # sur /dev/ttyUSB0). Tout le reste — curobo, robot_segmentation,
+    # execute_trajectory, ridgeback_control — tourne à l'identique : leeloo_gazebo
+    # expose les mêmes topics et types que ces drivers, y compris
+    # /dsr01/dsr_controller2/speedj_rt_stream et /dsr01/joint_states.
+    _not_sim = IfCondition(PythonExpression(
+        ["not '", LaunchConfiguration('sim'), "'.lower() in ('true', '1')"]))
+    # Horloge simulée. Ne rend PAS la chaîne d'exécution sim-time-paced : la
+    # boucle servo MPC, JointSpeedStrategy et le wall timer d'execute_trajectory
+    # restent cadencés sur l'horloge murale. Uniquement là pour que les
+    # timestamps TF/images soient cohérents avec /clock (sans quoi tout lookup
+    # TF échoue, le temps sim partant de ~0 face à un temps mur de ~1.7e9).
+    _use_sim_time = ParameterValue(LaunchConfiguration('sim'), value_type=bool)
+
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'sim', default_value='false',
+            description="true : matériel simulé par leeloo_gazebo (driver Doosan "
+                        "et pince réelle débranchés)."),
+
         DeclareLaunchArgument('tf_remap',        default_value='/leeloo/tf'),
         DeclareLaunchArgument('tf_static_remap', default_value='/leeloo/tf_static'),
 
@@ -104,8 +126,13 @@ def generate_launch_description():
         DeclareLaunchArgument('diag_dir',  default_value='/home/ros2_ws/diag'),
 
         # ── Doosan bringup (scope global : ne pas casser les internes dsr01) ───
+        # En sim : remplacé par dsr_sim_bridge (leeloo_gazebo), qui consomme le
+        # même /dsr01/dsr_controller2/speedj_rt_stream et publie le même
+        # /dsr01/joint_states. execute_trajectory n'appelle aucun service Doosan,
+        # donc il n'a besoin de rien d'autre.
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(dsr_launch_file),
+            condition=_not_sim,
             launch_arguments={
                 'mode':  LaunchConfiguration('mode'),
                 'host':  LaunchConfiguration('host'),
@@ -123,10 +150,17 @@ def generate_launch_description():
             SetRemap('/tf',        LaunchConfiguration('tf_remap')),
             SetRemap('/tf_static', LaunchConfiguration('tf_static_remap')),
 
+            # Pince réelle. En sim, gz_ros2_control héberge son propre
+            # controller_manager et sert un robotiq_gripper_controller de même
+            # nom et même type (parallel_gripper_action_controller/
+            # GripperActionController), donc /robotiq_gripper_controller/gripper_cmd
+            # existe dans les deux cas. Lancer celui-ci en plus créerait un
+            # second /controller_manager en collision sur le graphe.
             Node(
                 package='controller_manager',
                 executable='ros2_control_node',
                 output='screen',
+                condition=_not_sim,
                 parameters=[
                     gripper_update_rate_file,
                     gripper_controllers_file,
@@ -138,16 +172,19 @@ def generate_launch_description():
             Node(
                 package='controller_manager',
                 executable='spawner',
+                condition=_not_sim,
                 arguments=['joint_state_broadcaster', '-c', '/controller_manager'],
             ),
             Node(
                 package='controller_manager',
                 executable='spawner',
+                condition=_not_sim,
                 arguments=['robotiq_gripper_controller', '-c', '/controller_manager'],
             ),
             Node(
                 package='controller_manager',
                 executable='spawner',
+                condition=_not_sim,
                 arguments=['robotiq_activation_controller', '-c', '/controller_manager'],
             ),
 
@@ -205,6 +242,7 @@ def generate_launch_description():
                     # combiné des caméras (frame_rate_hz dans cameras.yaml), donc cette
                     # valeur reste valable si on ajoute une caméra ou change un fps.
                     'decay_half_life_s': 0.7,
+                    'use_sim_time': _use_sim_time,
                 }],
             ),
             Node(
@@ -228,6 +266,7 @@ def generate_launch_description():
                     'oak_wrist.depth_image_topic': '/oak/stereo/image_raw',
                     'oak_wrist.camera_info_topic': '/oak/stereo/camera_info',
                     'oak_wrist.output_topic': 'masked_depth_image_oak_wrist',
+                    'use_sim_time': _use_sim_time,
                 }],
             ),
 
@@ -240,6 +279,7 @@ def generate_launch_description():
                 parameters=[{
                     'command_period': 0.03,
                     'speedj_time': 0.02,
+                    'use_sim_time': _use_sim_time,
                 }],
             ),
             Node(
@@ -248,6 +288,7 @@ def generate_launch_description():
                 output='screen',
                 respawn=True,
                 respawn_delay=2.0,
+                parameters=[{'use_sim_time': _use_sim_time}],
             ),
         ]),
     ])

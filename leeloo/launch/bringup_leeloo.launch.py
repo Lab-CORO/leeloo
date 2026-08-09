@@ -1,5 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 import os
@@ -34,22 +35,46 @@ from ament_index_python.packages import get_package_share_directory
 #   • tf.launch.py            : relais TF + robot_state_publisher (structure/viz)
 #   • control.launch.py       : bras Doosan, ros2_control/gripper, curobo, execute_trajectory
 #   • leeloo_calibration/launch/calibration.launch.py : markertracker, handeye_server, auto_calibration_server
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# Mode simulation (sim:=true)
+# ─────────────────────────────────────────────────────────────────────────────
+# sim:=true remplace le MATÉRIEL par leeloo_gazebo, sans rien changer au reste :
+# curobo, robot_segmentation, execute_trajectory et ridgeback_control tournent
+# à l'identique parce que leeloo_gazebo expose exactement les mêmes topics et
+# types que les vrais drivers (voir son docstring). Ce qui est débranché :
+#   • cameras.launch.py : drivers k4a + depthai (les images viennent de Gazebo)
+#   • control.launch.py : dsr_bringup2 + ros2_control_node de la pince réelle
+#   • tf.launch.py      : kinect_tf_computation_node (pose Kinect nominale en
+#                         sim) et leeloo_viz_state_publisher (remplacé par le
+#                         RSP de leeloo_gazebo, qui publie une description
+#                         surensemble : mêmes frames + les liens caméra)
+# Le défaut reste false : le chemin réel est inchangé par construction.
+#
+# Attention : toute la chaîne d'exécution est cadencée sur l'horloge MURALE
+# (boucle servo MPC de curobo, JointSpeedStrategy, wall timer d'
+# execute_trajectory), donc une conclusion sur le timing MPC n'est valable que
+# si Gazebo tient RTF ≈ 1. Sur Jetson avec les deux caméras 1280x720 c'est peu
+# probable — mesurer, et lancer avec enabled_cameras:='' pour les tests MPC.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def generate_launch_description():
     leeloo_share      = get_package_share_directory('leeloo')
     calibration_share = get_package_share_directory('leeloo_calibration')
+    leeloo_gazebo_share = get_package_share_directory('leeloo_gazebo')
 
     cameras_launch_file     = os.path.join(leeloo_share, 'launch', 'cameras.launch.py')
     tf_launch_file          = os.path.join(leeloo_share, 'launch', 'tf.launch.py')
     control_launch_file     = os.path.join(leeloo_share, 'launch', 'control.launch.py')
     calibration_launch_file = os.path.join(calibration_share, 'launch', 'calibration.launch.py')
+    gazebo_launch_file      = os.path.join(leeloo_gazebo_share, 'launch', 'leeloo_gazebo.launch.py')
 
     _tf_remap_args = {
         'tf_remap':        LaunchConfiguration('tf_remap'),
         'tf_static_remap': LaunchConfiguration('tf_static_remap'),
     }
+    _sim_arg = {'sim': LaunchConfiguration('sim')}
 
     return LaunchDescription([
         # ── Fix "sequence size exceeds remaining buffer" ───────────────────────
@@ -71,21 +96,49 @@ def generate_launch_description():
         # toutes les ~10 s (voir calibration.launch.py).
         DeclareLaunchArgument('enable_calibration', default_value='true'),
 
+        # Substitution du matériel par leeloo_gazebo — voir l'en-tête.
+        DeclareLaunchArgument(
+            'sim', default_value='false',
+            description="true : le matériel est simulé par leeloo_gazebo "
+                        "(drivers Doosan/Kinect/OAK/pince débranchés). "
+                        "Le reste de la pile est identique."),
+        # Caméras : même convention en réel et en simulé. En sim, la liste
+        # sélectionne les capteurs Gazebo au lieu des drivers.
+        DeclareLaunchArgument('enabled_cameras', default_value='kinect,oak'),
+
+        # Matériel simulé. standalone:=false parce que control.launch.py lance
+        # déjà ridgeback_control : une seconde instance dupliquerait les
+        # commandes de base.
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(cameras_launch_file)),
+            PythonLaunchDescriptionSource(gazebo_launch_file),
+            condition=IfCondition(LaunchConfiguration('sim')),
+            launch_arguments={
+                **_tf_remap_args,
+                'standalone': 'false',
+                'enabled_cameras': LaunchConfiguration('enabled_cameras'),
+            }.items()),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(cameras_launch_file),
+            launch_arguments={
+                **_sim_arg,
+                'enabled_cameras': LaunchConfiguration('enabled_cameras'),
+            }.items()),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(tf_launch_file),
-            launch_arguments=_tf_remap_args.items()),
+            launch_arguments={**_tf_remap_args, **_sim_arg}.items()),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(control_launch_file),
-            launch_arguments=_tf_remap_args.items()),
+            launch_arguments={**_tf_remap_args, **_sim_arg}.items()),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(calibration_launch_file),
             launch_arguments={
                 **_tf_remap_args,
+                **_sim_arg,
+                'enabled_cameras': LaunchConfiguration('enabled_cameras'),
                 'enable_calibration': LaunchConfiguration('enable_calibration'),
             }.items()),
     ])

@@ -61,8 +61,18 @@ def _handeye_remaps(prefix: str):
 
 
 def _camera_enabled(camera: str) -> list:
-    """Fragment d'expression Python : la caméra est dans `enabled_cameras`."""
-    return ["'", camera, "' in '", LaunchConfiguration('enabled_cameras'), "'.split(',')"]
+    """Fragment d'expression Python : la caméra est dans `enabled_cameras`.
+
+    ET `sim` est faux : la simulation (leeloo_gazebo) ne fournit QUE des images
+    de profondeur, pas de flux RGB ni son camera_info. markertracker_node, qui
+    détecte des marqueurs ArUco dans l'image couleur, retombe alors exactement
+    dans le bug décrit ci-dessous ('Failed to get camera info after multiple
+    attempts' → nœud à moitié construit → mort) et, comme il a respawn=True, il
+    boucle indéfiniment toutes les 5 s. La détection de marqueurs en simulation
+    demanderait une caméra couleur simulée, hors périmètre actuel.
+    """
+    return ["'", camera, "' in '", LaunchConfiguration('enabled_cameras'), "'.split(',')",
+            " and not '", LaunchConfiguration('sim'), "'.lower() in ('true', '1')"]
 
 
 def _calibration_enabled() -> list:
@@ -92,6 +102,11 @@ def generate_launch_description():
         DeclareLaunchArgument('tf_remap',        default_value='/leeloo/tf'),
         DeclareLaunchArgument('tf_static_remap', default_value='/leeloo/tf_static'),
         DeclareLaunchArgument('enabled_cameras', default_value='kinect,oak'),
+        DeclareLaunchArgument(
+            'sim', default_value='false',
+            description="true : matériel simulé (leeloo_gazebo). Coupe toute la "
+                        "chaîne de détection de marqueurs, qui a besoin d'un flux "
+                        "RGB que la simulation ne fournit pas."),
         DeclareLaunchArgument(
             'enable_calibration', default_value='true',
             description="Démarre la chaîne de calibration main-œil (markertrackers "
