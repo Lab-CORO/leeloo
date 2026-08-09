@@ -9,10 +9,27 @@ from ament_index_python.packages import PackageNotFoundError, get_package_share_
 
 
 def generate_launch_description():
-    kinect_driver_share = get_package_share_directory('azure_kinect_ros_driver')
-    leeloo_share        = get_package_share_directory('leeloo')
+    leeloo_share = get_package_share_directory('leeloo')
 
-    kinect_launch_file = os.path.join(kinect_driver_share, 'launch', 'driver.launch.py')
+    # Le driver Kinect est résolu de façon TOLÉRANTE, pour exactement la même
+    # raison que le driver OAK ci-dessous : sa résolution était inconditionnelle
+    # et faisait échouer tout le bringup avec PackageNotFoundError quand
+    # azure_kinect_ros_driver n'est pas installé — y compris en sim:=true, où ce
+    # driver n'est jamais lancé (les images viennent des capteurs Gazebo).
+    # Les IfCondition ci-dessous ne gardent que l'EXÉCUTION des actions ; elles
+    # n'empêchent pas cet appel-ci de lever, puisqu'il s'évalue à la
+    # construction de la LaunchDescription.
+    try:
+        kinect_driver_share = get_package_share_directory('azure_kinect_ros_driver')
+        kinect_launch_file  = os.path.join(kinect_driver_share, 'launch', 'driver.launch.py')
+        _kinect_available   = True
+    except PackageNotFoundError:
+        _kinect_available = False
+        # Chemin factice, jamais lu : _kinect_enabled est forcé à False ici.
+        kinect_launch_file = os.path.join(leeloo_share, 'launch', '_kinect_driver_absent.launch.py')
+        print("[cameras.launch] azure_kinect_ros_driver introuvable — la caméra Kinect "
+              "ne sera pas lancée (sans effet en sim:=true, où leeloo_gazebo publie "
+              "/depth_to_rgb/* depuis Gazebo).")
 
     # Le driver OAK est résolu de façon TOLÉRANTE : sa résolution était
     # inconditionnelle et faisait échouer tout le bringup avec PackageNotFoundError
@@ -46,7 +63,8 @@ def generate_launch_description():
     # faute de matériel USB.
     _kinect_enabled = IfCondition(PythonExpression(
         ["'kinect' in '", LaunchConfiguration('enabled_cameras'), "'.split(',')",
-         " and not '", LaunchConfiguration('sim'), "'.lower() in ('true', '1')"]))
+         " and not '", LaunchConfiguration('sim'), "'.lower() in ('true', '1')",
+         f" and {_kinect_available}"]))
     _oak_enabled = IfCondition(PythonExpression(
         ["'oak' in '", LaunchConfiguration('enabled_cameras'), "'.split(',')",
          " and not '", LaunchConfiguration('sim'), "'.lower() in ('true', '1')",
