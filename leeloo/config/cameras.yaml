@@ -7,6 +7,13 @@
 #     intrinsics: []
 #     extrinsics: []
 
+# frame_rate_hz : cadence RÉELLE de publication de `topic`, pas une consigne.
+# Elle sert uniquement à normaliser la décroissance du TSDF : cuRobo décrémente
+# le poids de TOUS les voxels une fois par appel integrate(), donc le débit qui
+# compte est la SOMME des cadences de toutes les caméras déclarées ici. Le nœud
+# en déduit `decay_factor` à partir de `decay_half_life_s` (obstacle_manager.py).
+# À garder synchronisé avec les drivers, sinon l'oubli dérive silencieusement.
+
 cameras:
   - name: depth_map_test
     type: depth_camera
@@ -15,6 +22,27 @@ cameras:
     camera_info: /depth_to_rgb/camera_info
     intrinsic_matrix: []
     extrinsic_matrix: []
+    # Source de vérité : argument de launch `fps` (bringup_leeloo.launch.py).
+    frame_rate_hz: 5.0
+
+  - name: oak_wrist
+    type: depth_camera
+    # Was /oak/stereo/image_raw (raw driver output). Now consumes
+    # robot_segmentation's masked output (control.launch.py's robot_segmentation
+    # node, camera_names: ['kinect', 'oak_wrist']) so the wrist-mounted OAK gets
+    # the same robot self-masking + shared set_mask object masks as the Kinect.
+    topic: /masked_depth_image_oak_wrist
+    frame_id: oak_left_camera_optical_frame
+    camera_info: /oak/stereo/camera_info
+    intrinsics: []
+    # Format cuRobo : [x, y, z, qw, qx, qy, qz] -- LE W EST EN PREMIER.
+    # L'identité s'écrit 1,0,0,0 et NON 0,0,0,1 (qui serait un demi-tour en Z).
+    # Non vide => TF n'est jamais consulté pour cette caméra
+    # (camera_depth_map_strategy.py:120). C'est voulu ici : ça sort le relais
+    # /tf_static et l'horloge du device OAK du périmètre du test.
+    extrinsics: []
+    # Source de vérité : `i_fps` dans leeloo/config/oak_sr_depth.yaml.
+    frame_rate_hz: 5.0
 
 
 

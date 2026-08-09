@@ -1,16 +1,8 @@
 from launch import LaunchDescription
-from launch.actions import (
-    DeclareLaunchArgument,
-    IncludeLaunchDescription,
-    SetEnvironmentVariable,
-    TimerAction,
-    GroupAction,
-)
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node, SetRemap
 import os
-import yaml
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -29,270 +21,35 @@ from ament_index_python.packages import get_package_share_directory
 #   • Caméra    (base_link→camera_base) ─ node calibration, direct ──▶ /leeloo
 #
 # Les nodes "côté Leeloo" (RSP structure, calibration, curobo, segmentation,
-# markertracker, handeye) sont enveloppés dans un GroupAction + SetRemap qui
-# redirige UNIQUEMENT /tf et /tf_static vers /leeloo/tf[_static]. Les topics de
-# DONNÉES (images, services dsr01, etc.) restent globaux et inchangés.
+# markertracker, handeye) redirigent /tf et /tf_static vers /leeloo/tf[_static],
+# chacun via son propre GroupAction + SetRemap paramétré par tf_remap /
+# tf_static_remap (voir tf.launch.py, control.launch.py, leeloo_calibration/
+# launch/calibration.launch.py). Les topics de DONNÉES (images, services dsr01,
+# etc.) restent globaux et inchangés.
 #
-# Le bras Doosan et le driver Kinect restent lancés au scope global (on ne casse
-# pas leurs internes) et leurs TF sont ramenés par relais (topic_tools/relay).
+# Ce fichier n'est plus qu'un orchestrateur : il déclare les env vars globales
+# et les arguments de remap TF (source de vérité unique), puis inclut les
+# fichiers thématiques :
+#   • cameras.launch.py      : Kinect + OAK-D SR
+#   • tf.launch.py            : relais TF + robot_state_publisher (structure/viz)
+#   • control.launch.py       : bras Doosan, ros2_control/gripper, curobo, execute_trajectory
+#   • leeloo_calibration/launch/calibration.launch.py : markertracker, handeye_server, auto_calibration_server
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _tf_relay(name, src, dst):
-    """topic_tools/relay : recopie le topic TF `src` vers `dst`."""
-    return Node(
-        package='topic_tools',
-        executable='relay',
-        name=name,
-        arguments=[src, dst],
-        output='screen',
-        respawn=True,
-        respawn_delay=2.0,
-    )
-
-
 def generate_launch_description():
-    # Package share paths
-    dsr_bringup_share   = get_package_share_directory('dsr_bringup2')
-    kinect_driver_share = get_package_share_directory('azure_kinect_ros_driver')
-    handeye_share       = get_package_share_directory('hand_eye_calibration')
-    leeloo_share        = get_package_share_directory('leeloo')
+    leeloo_share      = get_package_share_directory('leeloo')
+    calibration_share = get_package_share_directory('leeloo_calibration')
 
-    # Launch file paths
-    dsr_launch_file    = os.path.join(dsr_bringup_share,   'launch', 'dsr_bringup2_rviz.launch.py')
-    kinect_launch_file = os.path.join(kinect_driver_share, 'launch', 'driver.launch.py')
-    handeye_launch_file = os.path.join(handeye_share,      'calibration.launch.py')
+    cameras_launch_file     = os.path.join(leeloo_share, 'launch', 'cameras.launch.py')
+    tf_launch_file          = os.path.join(leeloo_share, 'launch', 'tf.launch.py')
+    control_launch_file     = os.path.join(leeloo_share, 'launch', 'control.launch.py')
+    calibration_launch_file = os.path.join(calibration_share, 'launch', 'calibration.launch.py')
 
-    # CuRobo config — read base_link and urdf_path from the YAML so they stay
-    # consistent with what the planner reads at runtime (single source of truth).
-    leeloo_curobo_config = os.path.join(leeloo_share, 'config', 'leeloo_curobo.yaml')
-    leeloo_urdf = os.path.join(leeloo_share, 'urdf', 'leeloo.urdf')
-    with open(leeloo_curobo_config, 'r') as f:
-        _cfg = yaml.safe_load(f)
-    _kin = _cfg.get('robot_cfg', {}).get('kinematics', {})
-    curobo_base_link = _kin.get('base_link', 'base_link')
-    curobo_urdf_path = _kin.get('urdf_path', os.path.join(leeloo_share, 'urdf', 'leeloo.urdf'))
-
-    # URDF de la structure (pont default_mount → … → robot_mount → dsr01/world).
-    # Tous joints fixes → robot_state_publisher publie dans /leeloo/tf_static.
-    structure_urdf = os.path.join(leeloo_share, 'urdf', 'leeloo_structure.urdf')
-    with open(structure_urdf, 'r') as f:
-        structure_description = f.read()
-
-    # URDF combiné (Ridgeback + structure + bras m1013) pour RViz uniquement.
-    # Noms de frames alignés sur l'arbre TF réel /leeloo/tf[_static] (default_mount,
-    # dsr01/world, dsr01/link_1…6) : RobotModel de RViz place chaque lien via un
-    # lookup TF par nom, pas par FK propre — donc ce fichier n'a besoin QUE des bons
-    # noms, pas de valeurs de joint exactes. Caméra volontairement absente (sa pose
-    # est dynamique, cf. kinect_tf_computation_node) : elle ne sera pas rendue en
-    # mesh mais son repère existe déjà dans le TF live.
-    leeloo_combined_urdf = os.path.join(leeloo_share, 'urdf', 'leeloo.urdf')
-    with open(leeloo_combined_urdf, 'r') as f:
-        leeloo_combined_description = f.read()
-
-    # Gripper Robotiq 2F-85 : ros2_control_node a besoin du <ros2_control> ajouté
-    # dans leeloo.urdf (driver réel, COM_port /dev/ttyUSB0) → on lui passe le même
-    # robot_description que leeloo_viz_state_publisher, pas de fichier séparé.
-    robotiq_description_share = get_package_share_directory('robotiq_description')
-    gripper_controllers_file = os.path.join(robotiq_description_share, 'config', 'robotiq_controllers.yaml')
-    gripper_update_rate_file = os.path.join(robotiq_description_share, 'config', 'robotiq_update_rate.yaml')
-
-    # ── Groupe "côté Leeloo" : TF redirigés vers /leeloo, données inchangées ──
-    leeloo_tf_group = GroupAction([
-        SetRemap('/tf',        '/leeloo/tf'),
-        SetRemap('/tf_static', '/leeloo/tf_static'),
-
-        # RSP structure : publie default_mount→structure_base→…→robot_mount→dsr01/world
-        # dans /leeloo/tf_static (le maillon manquant entre Ridgeback et bras).
-        Node(
-            package='robot_state_publisher',
-            executable='robot_state_publisher',
-            name='structure_state_publisher',
-            output='screen',
-            parameters=[{'robot_description': structure_description}],
-        ),
-
-        # RSP dédié RViz : publie l'URDF combiné (Ridgeback+structure+bras) sur
-        # /leeloo/robot_description pour que RViz affiche les meshes du robot
-        # entier. Son /tf_static suit le remap ambiant du groupe comme tout le
-        # monde (→ /leeloo/tf_static) : il republie les mêmes fixed joints que
-        # structure_state_publisher/relais (valeurs identiques, doublon inoffensif).
-        # Pas de joint_states reçu (rien ne publie sur /joint_states global) →
-        # aucune TF articulée produite ici, pas de conflit avec les valeurs
-        # dynamiques réelles (bras, roues) qui viennent des vraies sources.
-        Node(
-            package='robot_state_publisher',
-            executable='robot_state_publisher',
-            name='leeloo_viz_state_publisher',
-            output='screen',
-            parameters=[{'robot_description': leeloo_combined_description}],
-            remappings=[
-                ('robot_description', '/leeloo/robot_description'),
-            ],
-        ),
-
-        # Gripper Robotiq 2F-85 — équivalent de
-        # `ros2 launch robotiq_description robotiq_control.launch.py`, sans les
-        # nodes de description (pas de robot_state_publisher ni rviz : le TF du
-        # gripper vient déjà de leeloo_viz_state_publisher ci-dessus).
-        # ros2_control_node ignore le paramètre 'robot_description' et s'abonne
-        # toujours au TOPIC 'robot_description' — remappé ici vers
-        # /leeloo/robot_description (publié par leeloo_viz_state_publisher,
-        # seul RSP dont l'URDF contient le tag <ros2_control> du gripper).
-        # Sans ce remap il reçoit le /robot_description global, qui est celui
-        # de structure_state_publisher (leeloo_structure.urdf, sans gripper) →
-        # crash "no 'ros2_control' tag found in the URDF".
-        Node(
-            package='controller_manager',
-            executable='ros2_control_node',
-            output='screen',
-            parameters=[
-                gripper_update_rate_file,
-                gripper_controllers_file,
-            ],
-            remappings=[
-                ('robot_description', '/leeloo/robot_description'),
-            ],
-        ),
-        Node(
-            package='controller_manager',
-            executable='spawner',
-            arguments=['joint_state_broadcaster', '-c', '/controller_manager'],
-        ),
-        Node(
-            package='controller_manager',
-            executable='spawner',
-            arguments=['robotiq_gripper_controller', '-c', '/controller_manager'],
-        ),
-        Node(
-            package='controller_manager',
-            executable='spawner',
-            arguments=['robotiq_activation_controller', '-c', '/controller_manager'],
-        ),
-
-        # Caméra : dsr01/world→camera_base depuis le résultat hand-eye.
-        # Ancrée sur la racine du bras Doosan (frame_prefix dsr01/) → caméra et
-        # bras partagent dsr01/world, indépendamment du Ridgeback.
-        Node(
-            package='leeloo_calibration',
-            executable='kinect_tf_computation_node',
-            name='kinect_tf_computation_node',
-            output='screen',
-            respawn=True,
-            respawn_delay=2.0,
-            parameters=[{
-                'calibration_result_file': '/home/ros2_ws/src/leeloo_calibration/config/kinect_hand_eye_result.yaml',
-                'robot_base_frame': 'dsr01/world',
-            }],
-        ),
-
-        # CuRobo trajectory planner — launched directly to avoid the extra nodes
-        # that gen_traj.launch.py pulls in (standalone RSP, emulator JSP, preview
-        # nodes). Those are irrelevant on the real robot and conflict with the
-        # unified /leeloo TF tree (duplicate robot_state_publisher on /tf).
-        Node(
-            package='curobo_ros',
-            executable='curobo_trajectory_planner',
-            name='curobo_trajectory_planner',
-            output='screen',
-            respawn=True,
-            respawn_delay=5.0,
-            parameters=[{
-                'robot_config_file': leeloo_curobo_config,
-                'urdf_path': leeloo_urdf,
-                'interpolation_dt': 0.03,
-                'cameras_config_file': LaunchConfiguration('cameras_config_file'),
-                'base_link': "dsr01/world",
-                'world_file': LaunchConfiguration('world_file'),
-                'voxel_size': LaunchConfiguration('voxel_size'),
-                # Mapper ESDF grid: 128^3 @ 0.02 m centred on robot base.
-                'mapper_extent_xyz': [2.56, 2.56, 2.56],
-                'mapper_grid_center': [0.0, 0.0, 0.0],
-                # Depth frame resolution fed to mapper.integrate().
-                # Must match the Azure Kinect depth_to_rgb output (1280x720).
-                'mapper_image_width': 1280,
-                'mapper_image_height': 720,
-                'mpc_solver_type': 'mppi_acceleration',
-                'mpc_warm_start_iters': 2 ,
-                'mpc_cold_start_iters': 10,
-                # Sparse voxel topic publish rate (Hz); <= 0 disables it.
-                'sparse_voxel_publish_rate': 5.0,
-            }],
-        ),
-        Node(
-            package='curobo_ros',
-            executable='robot_segmentation',
-            output='screen',
-            respawn=True,
-            respawn_delay=2.0,
-            parameters=[{
-                'robot_base_frame': 'dsr01/world',
-                'robot_config_file': leeloo_curobo_config,
-                'urdf_path': leeloo_urdf,
-            }],
-        ),
-
-        Node(
-            package='leeloo',
-            executable='execute_trajectory',
-            output='screen',
-            respawn=True,
-            respawn_delay=2.0,
-        ),
-
-        # ── Calibration (délai : attendre que la TF caméra soit dispo) ──
-        TimerAction(period=5.0, actions=[
-            Node(
-                package='ros2_markertracker',
-                executable='markertracker_node',
-                output='screen',
-                namespace='/ros2_markertracker',
-                respawn=True,
-                respawn_delay=5.0,
-                parameters=[{
-                    'input_image_topic':          '/rgb/image_raw',
-                    'publish_topic_image_result': True,
-                    'camera_info_topic':          '/rgb/camera_info',
-                    'marker_length':              5.7,
-                    'aruco_dictionary_id':        'DICT_APRILTAG_36H11',
-                    'camera_frame_id':            'rgb_camera_link',
-                    # Préfixe des TF par marqueur : un TF marker_<id> par ID détecté
-                    # (ex: marker_21 = marqueur de calibration, cf. tracking_marker_frame
-                    # dans le hand_eye_calibration ci-dessous).
-                    'marker_frame_id':            'marker',
-                    'ignore_marker_ids_array':    17,
-                }]
-            ),
-
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(handeye_launch_file),
-                launch_arguments={
-                    'calibration_type':        'eye-on-base',
-                    'namespace_prefix':        'kinect_calib',
-                    'freehand_robot_movement': 'true',
-                    # Frames du bras Doosan préfixées par frame_prefix='dsr01/'.
-                    # On ancre la calibration sur la racine du bras (dsr01/world,
-                    # confondue avec base_link) et l'effecteur dsr01/link_6, pour
-                    # que la relation caméra↔bras soit indépendante de la base mobile.
-                    'robot_base_frame':        'dsr01/world',
-                    'robot_effector_frame':    'dsr01/link_6',
-                    'tracking_base_frame':     'rgb_camera_link',
-                    # ID 21 = marqueur dédié à la calibration (le markertracker publie
-                    # un TF par ID détecté : marker_<id>, cf. marker_frame_id ci-dessous).
-                    'tracking_marker_frame':   'marker_21',
-                }.items()
-            ),
-
-            Node(
-                package='leeloo_calibration',
-                executable='auto_calibration_server',
-                name='auto_calibration_server',
-                output='screen',
-                respawn=True,
-                respawn_delay=5.0,
-            ),
-        ]),
-    ])
+    _tf_remap_args = {
+        'tf_remap':        LaunchConfiguration('tf_remap'),
+        'tf_static_remap': LaunchConfiguration('tf_static_remap'),
+    }
 
     return LaunchDescription([
         # ── Fix "sequence size exceeds remaining buffer" ───────────────────────
@@ -302,77 +59,33 @@ def generate_launch_description():
         # NOT be set to empty string — that triggers a realpath("") XMLPARSER error.
         SetEnvironmentVariable('RMW_FASTRTPS_USE_QOS_FROM_XML', '0'),
 
-        # ── k4a GPU depth engine ───────────────────────────────────────────────
-        # libdepthengine.so uses OpenGL compute shaders for depth processing.
-        # GLVND defaults to Mesa (llvmpipe, CPU) via Xvfb's vendor advertisement.
-        # Forcing the NVIDIA vendor makes the depth engine run on the Tegra GPU.
-        SetEnvironmentVariable('DISPLAY', ':99'),
-        SetEnvironmentVariable('__GLX_VENDOR_LIBRARY_NAME', 'nvidia'),
+        # Nom des topics remappés depuis /tf, /tf_static côté "Leeloo" — seule
+        # source de vérité, propagée explicitement à chaque fichier inclus.
+        DeclareLaunchArgument('tf_remap',        default_value='/leeloo/tf'),
+        DeclareLaunchArgument('tf_static_remap', default_value='/leeloo/tf_static'),
 
-        # ── Launch arguments ──────────────────────────────────────────────────
-        DeclareLaunchArgument('mode',     default_value='real'),
-        DeclareLaunchArgument('host',     default_value='192.168.50.100'),
-        DeclareLaunchArgument('rt_host',  default_value='192.168.50.50'),
-        DeclareLaunchArgument('port',     default_value='12345'),
-        DeclareLaunchArgument('model',    default_value='m1013'),
-        DeclareLaunchArgument('gui',      default_value='False'),
+        # Chaîne de calibration main-œil (markertrackers du marqueur de
+        # calibration, handeye_server, auto_calibration_server). À passer à
+        # false en exploitation : sans marqueur de calibration en vue,
+        # handeye_server ne crée jamais ses services et spamme des ERROR
+        # toutes les ~10 s (voir calibration.launch.py).
+        DeclareLaunchArgument('enable_calibration', default_value='true'),
 
-        DeclareLaunchArgument('cameras_config_file', default_value='/home/ros2_ws/src/leeloo/config/cameras.yaml'),
-        DeclareLaunchArgument('world_file',          default_value='/home/ros2_ws/src/leeloo/config/leeloo_world.yaml'),
-        DeclareLaunchArgument('voxel_size',          default_value='0.02'),
-
-        # Kinect camera arguments — tunable without editing this file.
-        # NFOV_UNBINNED uses ~40% less USB bandwidth than WFOV_UNBINNED,
-        # which prevents the "Failed to poll cameras" FATAL crash.
-        DeclareLaunchArgument('depth_mode',        default_value='NFOV_UNBINNED'),
-        DeclareLaunchArgument('color_enabled',     default_value='true'),
-        DeclareLaunchArgument('color_format',      default_value='bgra'),
-        DeclareLaunchArgument('color_resolution',  default_value='720P'),
-        DeclareLaunchArgument('fps',               default_value='5'),
-        DeclareLaunchArgument('rgb_point_cloud',   default_value='false'),
-        DeclareLaunchArgument('point_cloud',       default_value='false'),
-        DeclareLaunchArgument('imu_rate_target',   default_value='100'),
-
-        # ── Relais TF : ramènent les arbres externes/globaux vers /leeloo ──────
-        # Ridgeback (autre machine, namespace /r100_0597).
-        _tf_relay('relay_ridgeback_tf',        '/r100_0597/tf',        '/leeloo/tf'),
-        _tf_relay('relay_ridgeback_tf_static', '/r100_0597/tf_static', '/leeloo/tf_static'),
-        # Bras Doosan + driver Kinect (publient sur le /tf[_static] global).
-        _tf_relay('relay_global_tf',           '/tf',                  '/leeloo/tf'),
-        _tf_relay('relay_global_tf_static',    '/tf_static',           '/leeloo/tf_static'),
-
-        # ── Doosan bringup (scope global : ne pas casser les internes dsr01) ───
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(dsr_launch_file),
-            launch_arguments={
-                'mode':  LaunchConfiguration('mode'),
-                'host':  LaunchConfiguration('host'),
-                'port':  LaunchConfiguration('port'),
-                'model': LaunchConfiguration('model'),
-                'gui':   LaunchConfiguration('gui'),
-                # Préfixe TF sur le RSP Doosan → frames dsr01/world, dsr01/base_link,
-                # dsr01/link_1…6. Évite la collision base_link avec le Ridgeback et
-                # rend la racine du bras identifiable de façon unique.
-                'frame_prefix': 'dsr01/',
-            }.items()
-        ),
+            PythonLaunchDescriptionSource(cameras_launch_file)),
 
-        # ── Azure Kinect (scope global : garde ses topics de données globaux) ──
-        # driver.launch.py gère son propre robot_state_publisher (frames caméra).
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(kinect_launch_file),
-            launch_arguments={
-                'depth_mode':       LaunchConfiguration('depth_mode'),
-                'color_enabled':    LaunchConfiguration('color_enabled'),
-                'color_format':     LaunchConfiguration('color_format'),
-                'color_resolution': LaunchConfiguration('color_resolution'),
-                'fps':              LaunchConfiguration('fps'),
-                'rgb_point_cloud':  LaunchConfiguration('rgb_point_cloud'),
-                'point_cloud':      LaunchConfiguration('point_cloud'),
-                'imu_rate_target':  LaunchConfiguration('imu_rate_target'),
-            }.items()
-        ),
+            PythonLaunchDescriptionSource(tf_launch_file),
+            launch_arguments=_tf_remap_args.items()),
 
-        # ── Nodes côté Leeloo (TF → /leeloo, données inchangées) ──────────────
-        leeloo_tf_group,
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(control_launch_file),
+            launch_arguments=_tf_remap_args.items()),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(calibration_launch_file),
+            launch_arguments={
+                **_tf_remap_args,
+                'enable_calibration': LaunchConfiguration('enable_calibration'),
+            }.items()),
     ])

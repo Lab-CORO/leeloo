@@ -41,28 +41,37 @@ robot_cfg:
                   "radius": 0.101
             dsr01/link_5: # Link5 is according to -y
                 - "center": [0.00397, -0.00007, 0.00397]
-                  "radius": 0.101
+                  "radius": 0.05
+                - "center": [0.00397, 0.05007, 0.00397]
+                  "radius": 0.05
             dsr01/link_6: # Link6 is according to z
                 - "center": [0.00466, 0.00667, -0.04205]
                   "radius": 0.065
+            # Remapped for the ros2_robotiq_gripper mesh port: the old fork's
+            # base_link local axes were forward=X, lateral=Y, thickness(knuckle
+            # rotation axis)=Z; the new one is forward=Z, lateral=X, thickness=Y.
+            # Each center below is the old (x, y, z) permuted to (y, z, x) --
+            # same physical envelope, expressed in the new local frame.
             robotiq_85_base_link:
-              - center: [0.084, 0.05, 0]
+              - center: [0.05, 0, 0.084]
                 radius: 0.027
-              - center: [0.044, 0, 0]
+              - center: [0, -0.1, 0.044]
                 radius: 0.047
-              - center: [0.104, 0.060, 0]
+              - center: [0, 0, 0.044]
+                radius: 0.047
+              - center: [0.06, 0, 0.104]
                 radius: 0.017
-              - center: [0.124, 0.06, 0]
+              - center: [0.06, 0, 0.124]
                 radius: 0.017
-              - center: [0.144, 0.06, 0]
+              - center: [0.06, 0, 0.160]
                 radius: 0.017
-              - center: [0.144, -0.06, 0]
+              - center: [-0.06, 0, 0.160]
                 radius: 0.017
-              - center: [0.124, -0.06, 0]
+              - center: [-0.06, 0, 0.124]
                 radius: 0.017
-              - center: [0.104, -0.06, 0]
+              - center: [-0.06, 0, 0.104]
                 radius: 0.017
-              - center: [0.084, -0.05, 0]
+              - center: [-0.05, 0, 0.084]
                 radius: 0.027
                   
         collision_sphere_buffer: 0.01
@@ -70,12 +79,12 @@ robot_cfg:
         self_collision_ignore : {
           "dsr01/world": ["dsr01/link_1"],
           "dsr01/link_1": ["dsr01/link_2", "dsr01/link_3"],
-          "dsr01/link_2": ["dsr01/link_3", "dsr01/link_5"],
-          "dsr01/link_3": ["dsr01/link_4", "dsr01/link_5", "dsr01/link_6"],
-          "dsr01/link_4": ["dsr01/link_5", "dsr01/link_6"],
-          "dsr01/link_5": ["dsr01/link_6", "robotiq_85_base_link"],
-          "dsr01/link_6": ["robotiq_85_base_link"],
-          "robotiq_85_base_link": [robotiq_85_left_inner_knuckle_link, robotiq_85_left_knuckle_link, robotiq_85_right_inner_knuckle_link, robotiq_85_right_knuckle_link],
+          "dsr01/link_2": ["dsr01/link_3", "dsr01/link_4", "dsr01/link_5"],
+          "dsr01/link_3": ["dsr01/link_2", "dsr01/link_4", "dsr01/link_5", "dsr01/link_6"],
+          "dsr01/link_4": ["dsr01/link_2", "dsr01/link_3", "dsr01/link_5", "dsr01/link_6"],
+          "dsr01/link_5": ["dsr01/link_4", "robotiq_85_base_link", "dsr01/link_3", "dsr01/link_6", "robotiq_85_base_link"],
+          "dsr01/link_6": ["dsr01/link_5" , "robotiq_85_base_link"],
+          "robotiq_85_base_link": ["dsr01/link_6", "dsr01/link_5", robotiq_85_left_inner_knuckle_link, robotiq_85_left_knuckle_link, robotiq_85_right_inner_knuckle_link, robotiq_85_right_knuckle_link],
           "robotiq_85_left_finger_tip_link": [robotiq_85_left_inner_knuckle_link],
           "robotiq_85_left_inner_knuckle_link": [robotiq_85_left_finger_tip_link, robotiq_85_base_link],
           "robotiq_85_left_knuckle_link": [robotiq_85_base_link],
@@ -99,7 +108,7 @@ robot_cfg:
             default_joint_position:  [0.0, 0.0, 0.0, 0.0, 0.0, 0.00]
             null_space_weight:  [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
             cspace_distance_weight: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-            max_jerk: 500.0
-            max_acceleration: 1.0
+            max_jerk: 10.0
+            max_acceleration: 0.5
 
 

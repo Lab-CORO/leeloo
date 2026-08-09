@@ -1,0 +1,15 @@
+metadata:
+  calibration_type: eye_in_hand
+  camera_topic: /oak/stereo/image_raw
+  handeye_server: oak
+  saved_at: '2026-07-31T13:20:55'
+transform:
+  rotation:
+    w: 0.6143392199366886
+    x: 0.019589152417681693
+    y: -0.7885574498598278
+    z: 0.0195124633427684
+  translation:
+    x: 0.09244761324874931
+    y: -0.013206334984279882
+    z: 0.024658523349684148

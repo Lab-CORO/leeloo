@@ -1,0 +1,49 @@
+/oak:
+  ros__parameters:
+    pipeline_gen:
+      i_nn_type: none
+      i_pipeline_type: Depth
+
+    # Cadence alignée sur le Kinect (5 Hz) : la décroissance TSDF de cuRobo
+    # s'applique par appel integrate(), pas par seconde, donc chaque caméra
+    # ajoutée au débit combiné accélère l'effacement de la carte partagée.
+    # Voir /root/.claude/plans/comment-je-peux-ajouter-serene-otter.md.
+    left:
+      i_fps: 5.0
+    right:
+      i_fps: 5.0
+      i_publish_topic: true   # ← à ajouter
+
+      # NE PAS désactiver : oak_marker_detection (calibration hand-eye,
+      # bringup_leeloo.launch.py) s'abonne à /oak/right/image_raw et
+      # /oak/right/camera_info pour détecter marker_18.
+
+    stereo:
+      i_extended_disp: true
+      i_board_socket_id: 1        # CAM_B ("left") -> oak_left_camera_optical_frame
+      i_enable_left_rgbd: true   # pas de nuage de points/RGBD nécessaire ici
+      i_subpixel: true
+      i_fps: 5.0        
+
+      # Qualité d'appariement : réduit la géométrie fantôme injectée dans le TSDF.
+      i_lr_check: true
+      i_stereo_conf_threshold: 200
+      i_enable_speckle_filter: true
+      i_speckle_filter_speckle_range: 50
+
+      # Borne la portée AU DRIVER, pas via mapper_depth_min/max (globaux au
+      # Mapper et partagés avec le Kinect). Le plancher exclut la pince/le
+      # bracket vus à bout portant ; le plafond borne la longueur des rayons
+      # de creusement pendant que le hand-eye n'est pas encore calibré.
+      i_enable_threshold_filter: true
+      i_threshold_filter_min_range: 100    # mm
+      i_threshold_filter_max_range: 1500   # mm
+
+      # Le filtre temporel mélange des profondeurs de points de vue différents
+      # sur une caméra qui bouge (poignet) -> flou géométrique. Le filtre
+      # spatial bouche les trous en INVENTANT de la profondeur -> un trou est
+      # une information honnête pour une carte de collision, un trou bouché
+      # ne l'est pas. Les deux restent désactivés tant que la caméra est
+      # eye-in-hand.
+      i_enable_temporal_filter: false
+      i_enable_spatial_filter: false

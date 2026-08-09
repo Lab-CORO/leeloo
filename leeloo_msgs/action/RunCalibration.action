@@ -8,6 +8,11 @@
 # --- GOAL ---
 int32  num_poses              # Nb de poses à exécuter (0 = toutes)
 float64 wait_between_poses_s  # Délai (s) entre chaque capture (défaut: 2.0)
+string handeye_server         # ex: 'kinect', 'oak'. Vide => default_handeye_server (rétrocompat: 'kinect')
+string poses_file             # chemin du YAML de poses à balayer. Vide => calibration_poses_file (param, legacy)
+string camera_topic           # ex: /oak/stereo/image_raw. Sert à nommer le fichier résultat + traçabilité.
+                               # Vide => nom historique kinect_hand_eye_result.yaml
+string calibration_type       # 'eye_in_hand' | 'eye_on_base'. Vide => pas de validation croisée.
 
 ---
 # --- RESULT ---

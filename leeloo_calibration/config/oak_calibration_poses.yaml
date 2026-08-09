@@ -1,0 +1,93 @@
+metadata: {saved_at: '2026-07-31T13:05:42', total_poses: 18, joint_order: 'J1, J2,
+    J3, J4, J5, J6  (ordre natif Jazzy)'}
+poses:
+- index: 1
+  timestamp: '2026-07-31T13:01:45'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [0.0585658997, -0.3838633001, 1.9617927074, 3.0865271091, -0.8746855855,
+    0.218131423]
+- index: 2
+  timestamp: '2026-07-31T13:02:10'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [0.1042864099, 0.0018378437, 1.6666773558, 2.7321317196, -1.1908599138,
+    0.2185396105]
+- index: 3
+  timestamp: '2026-07-31T13:02:18'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [0.1383168846, 0.5612713099, 0.9513635635, 2.7321987152, -1.8212299347,
+    0.2185215354]
+- index: 4
+  timestamp: '2026-07-31T13:02:26'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.6414904594, 0.7456105947, 0.7689196467, 3.5279800892, -2.0056951046,
+    -0.7907512784]
+- index: 5
+  timestamp: '2026-07-31T13:02:53'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.9199244976, 0.2087470591, 1.4538860321, 3.5721459389, -1.5506188869,
+    -0.6619253159]
+- index: 6
+  timestamp: '2026-07-31T13:03:02'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-1.0505527258, -0.1480638385, 1.9766325951, 3.7551178932, -1.1762473583,
+    -0.6618736386]
+- index: 7
+  timestamp: '2026-07-31T13:03:21'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.457916081, -0.3849318624, 2.2647042274, 3.3213686943, -0.6986039281,
+    -0.3873330355]
+- index: 8
+  timestamp: '2026-07-31T13:03:32'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.3259340227, 0.1997211725, 1.54362607, 3.2777533531, -1.3816859722,
+    -0.4244276285]
+- index: 9
+  timestamp: '2026-07-31T13:03:42'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.2105817944, 0.8230881095, 0.5823917389, 3.0706460476, -2.068059206,
+    -0.0996241346]
+- index: 10
+  timestamp: '2026-07-31T13:04:26'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.2593591511, -0.1520590186, 1.9155224562, -0.0312325396, 0.8214283586,
+    3.1379964352]
+- index: 11
+  timestamp: '2026-07-31T13:04:33'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [0.2055076957, -0.089198187, 1.8948457241, -0.6299100518, 1.2126883268,
+    3.4562635422]
+- index: 12
+  timestamp: '2026-07-31T13:04:41'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.8880807161, 0.1994628161, 1.5636867285, 0.5241834521, 1.4647934437,
+    2.2710769176]
+- index: 13
+  timestamp: '2026-07-31T13:04:53'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.6237156391, 0.5194447041, 1.0476967096, 0.3227727711, 1.599734664,
+    2.4404828548]
+- index: 14
+  timestamp: '2026-07-31T13:05:10'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.0216459855, 0.1328051835, 1.5844150782, -0.3129966855, 1.2110193968,
+    3.1920287609]
+- index: 15
+  timestamp: '2026-07-31T13:05:17'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [0.4667683244, 0.2393796444, 1.7363564968, -0.8079240918, 1.2924734354,
+    3.8478827477]
+- index: 16
+  timestamp: '2026-07-31T13:05:29'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [0.2422994673, 0.6480227113, 0.9661393762, -0.5812230706, 1.9695022106,
+    3.4852120876]
+- index: 17
+  timestamp: '2026-07-31T13:05:35'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.2472722828, 0.6814497113, 0.886051476, -0.1013680771, 1.8376560211,
+    3.0951635838]
+- index: 18
+  timestamp: '2026-07-31T13:05:42'
+  joint_names: [joint_1, joint_2, joint_3, joint_4, joint_5, joint_6]
+  positions: [-0.6155061722, 0.791194737, 0.7857499123, 0.3377547264, 1.9478855133,
+    2.5277628899]

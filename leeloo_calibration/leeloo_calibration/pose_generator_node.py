@@ -34,6 +34,8 @@ from itertools import zip_longest
 
 import yaml
 
+from ament_index_python.packages import get_package_share_directory
+
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -415,7 +417,9 @@ class PoseGeneratorNode(Node):
             self.get_logger().error(f'[drive {num}/{total}] Action server not available.')
             return False
 
-        gh_future = self._exec_client.send_goal_async(SendTrajectory.Goal())
+        exec_goal = SendTrajectory.Goal()
+        exec_goal.target_joint_positions = list(candidate)
+        gh_future = self._exec_client.send_goal_async(exec_goal)
         gh = self._wait_for_future(gh_future, 10.0)
         if gh is None or not gh.accepted:
             self.get_logger().error(f'[drive {num}/{total}] Goal rejected.')
@@ -605,8 +609,10 @@ class PoseGeneratorNode(Node):
 
     @staticmethod
     def _default_output_path() -> str:
-        return os.path.normpath(os.path.join(
-            os.path.dirname(__file__), '..', 'config', 'calibration_poses.yaml'))
+        return os.path.join(
+            get_package_share_directory('leeloo_calibration'),
+            'config',
+            'calibration_poses.yaml')
 
 
 # =============================================================================

@@ -22,11 +22,15 @@ Enregistrer une pose :
 import enum
 import math
 import os
+import time
 from datetime import datetime
 
 import yaml
 
+from ament_index_python.packages import get_package_share_directory
+
 import rclpy
+from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
@@ -34,7 +38,9 @@ from rclpy.executors import MultiThreadedExecutor
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
 from dsr_msgs2.srv import SetRobotMode, SetSafetyMode
-from curobo_msgs.srv import GetCollisionDistance
+from curobo_msgs.srv import GetCollisionDistance, TrajectoryGeneration, SetPlanner
+from curobo_msgs.action import SendTrajectory
+from leeloo_msgs.srv import GotoPose
 
 
 # =============================================================================
@@ -55,10 +61,6 @@ TIMEOUTS = {
     State.SET_SAFETY_MODE_WAIT: 5,
 }
 
-# Réordonnancement JointState (J1,J2,J3,J4,J5,J6) → CALIBRATION_POSES (J1,J2,J4,J5,J3,J6)
-# Si le topic publie dans un ordre différent, ajuster ces indices.
-_CALIB_ORDER = [0, 1, 4, 2, 3, 5]
-
 
 # =============================================================================
 # Node
@@ -70,8 +72,8 @@ class PoseSaverNode(Node):
         super().__init__('pose_saver_node')
 
         # ---- Paramètres ROS --------------------------------------------------
-        self.declare_parameter('robot_mode_service',  '/dsr01/system/set_robot_mode')
-        self.declare_parameter('safety_mode_service', '/dsr01/system/set_safety_mode')
+        self.declare_parameter('robot_mode_service',  '/dsr01/dsr_controller2/system/set_robot_mode')
+        self.declare_parameter('safety_mode_service', '/dsr01/dsr_controller2/system/set_safety_mode')
         self.declare_parameter('joint_states_topic',  '/dsr01/joint_states')
         self.declare_parameter('output_file',         self._default_output_path())
 
@@ -86,6 +88,10 @@ class PoseSaverNode(Node):
 
         self.declare_parameter('load_existing_poses', True)
 
+        self.declare_parameter('traj_generate_service', '/curobo_trajectory_planner/generate_trajectory')
+        self.declare_parameter('traj_execute_action',   '/curobo_trajectory_planner/execute_trajectory')
+        self.declare_parameter('set_planner_service',   '/curobo_trajectory_planner/set_planner')
+
         # ---- Clients DSR -----------------------------------------------------
         self._robot_mode_client  = self.create_client(SetRobotMode,  robot_mode_srv)
         self._safety_mode_client = self.create_client(SetSafetyMode, safety_mode_srv)
@@ -96,6 +102,20 @@ class PoseSaverNode(Node):
             GetCollisionDistance, collision_srv,
             callback_group=self._reentrant_group)
 
+        # ---- Clients curobo (reentrant — pour /goto_pose) ---------------------
+        self._gen_client = self.create_client(
+            TrajectoryGeneration,
+            self.get_parameter('traj_generate_service').value,
+            callback_group=self._reentrant_group)
+        self._planner_client = self.create_client(
+            SetPlanner,
+            self.get_parameter('set_planner_service').value,
+            callback_group=self._reentrant_group)
+        self._exec_client = ActionClient(
+            self, SendTrajectory,
+            self.get_parameter('traj_execute_action').value,
+            callback_group=self._reentrant_group)
+
         # ---- Subscription joint states (dernier message conservé) ------------
         self._last_js: JointState | None = None
         self.create_subscription(JointState, joint_topic, self._on_joint_states, 10)
@@ -104,6 +124,8 @@ class PoseSaverNode(Node):
         self.create_service(Trigger, 'save_pose', self._on_save_pose,
                             callback_group=self._reentrant_group)
         self.create_service(Trigger, 'info_calibration', self._on_info_calibration,
+                            callback_group=self._reentrant_group)
+        self.create_service(GotoPose, 'goto_pose', self._on_goto_pose,
                             callback_group=self._reentrant_group)
 
         # ---- Données de session ----------------------------------------------
@@ -281,7 +303,6 @@ class PoseSaverNode(Node):
 
         names = list(self._last_js.name)
         raw   = [round(p, 10) for p in self._last_js.position]
-        calib = [raw[i] for i in _CALIB_ORDER]
 
         ok, reason = self._check_collision()
         if not ok:
@@ -290,7 +311,7 @@ class PoseSaverNode(Node):
             self.get_logger().warn(f'[save_pose] {response.message}')
             return response
 
-        redundant, reason = self._is_redundant(calib)
+        redundant, reason = self._is_redundant(raw)
         if redundant:
             response.success = False
             response.message = f'Pose not saved: {reason}'
@@ -303,7 +324,6 @@ class PoseSaverNode(Node):
             'timestamp':   datetime.now().isoformat(timespec='seconds'),
             'joint_names': names,
             'positions':   raw,
-            'calib_order': calib,
         })
 
         self._write_yaml()
@@ -342,12 +362,12 @@ class PoseSaverNode(Node):
 
     _REDUNDANCY_THRESHOLD = 0.5  # rad (Euclidean distance in 6D joint space)
 
-    def _is_redundant(self, calib: list[float]) -> tuple[bool, str]:
+    def _is_redundant(self, positions: list[float]) -> tuple[bool, str]:
         for p in self._poses:
-            existing = p['calib_order']
-            if len(existing) != len(calib):
+            existing = p['positions']
+            if len(existing) != len(positions):
                 continue
-            dist = math.sqrt(sum((a - b) ** 2 for a, b in zip(calib, existing)))
+            dist = math.sqrt(sum((a - b) ** 2 for a, b in zip(positions, existing)))
             if dist < self._REDUNDANCY_THRESHOLD:
                 return True, (
                     f"Too close to pose {p['index']} "
@@ -367,9 +387,9 @@ class PoseSaverNode(Node):
             f'Recorded poses : {n} / {MIN_POSES} recommended'
             + (' [OK]' if n >= MIN_POSES else ' [MISSING]'))
 
-        j1s = [p['calib_order'][0] for p in self._poses]
-        j2s = [p['calib_order'][1] for p in self._poses]
-        j3s = [p['calib_order'][2] for p in self._poses]
+        j1s = [p['positions'][0] for p in self._poses]
+        j2s = [p['positions'][1] for p in self._poses]
+        j3s = [p['positions'][2] for p in self._poses]
 
         def j1_zone(v): return 'Left'   if v < -0.5 else ('Right' if v > 0.5 else 'Center')
         def j2_zone(v): return 'Negative' if v < 0  else ('Low'   if v < 0.5 else 'High')
@@ -400,7 +420,7 @@ class PoseSaverNode(Node):
             f'  Elbow down (j3 < -0.1) : {elbow_down} pose(s)'
             + ('' if elbow_down >= 3 else ' [MISSING] (< 3 recommended)'))
 
-        risky = [p['index'] for p in self._poses if p['calib_order'][1] > 1.8]
+        risky = [p['index'] for p in self._poses if p['positions'][1] > 1.8]
         if risky:
             lines.append(
                 f'\nRisky poses (j2 > 1.2 rad -> likely GRAPH_FAIL): {risky}')
@@ -418,6 +438,90 @@ class PoseSaverNode(Node):
         return response
 
     # =========================================================================
+    # Service /goto_pose — drive to a saved pose, then restore teach mode
+    # =========================================================================
+
+    def _on_goto_pose(self, request, response):
+        if self._state != State.READY:
+            response.success = False
+            response.message = (
+                f'Node not ready yet (state: {self._state.value}). '
+                f'Try again in a few seconds.')
+            return response
+
+        pose = next((p for p in self._poses if p['index'] == request.index), None)
+        if pose is None:
+            valid = [p['index'] for p in self._poses]
+            response.success = False
+            response.message = f'No pose with index {request.index}. Valid indices: {valid}'
+            return response
+
+        target = pose['positions']
+        try:
+            ok, msg = self._drive_to_pose(target)
+        finally:
+            self._restore_teach_mode()
+
+        response.success = ok
+        response.message = msg if not ok else f'Arrived at pose {request.index}. Teach mode restored.'
+        return response
+
+    def _drive_to_pose(self, target: list[float]) -> tuple[bool, str]:
+        # Passage en mode autonome (best-effort — on tente le mouvement même en cas d'échec).
+        req_mode = SetRobotMode.Request()
+        req_mode.robot_mode = 1  # ROBOT_MODE_AUTONOMOUS
+        resp = self._wait_for_future(self._robot_mode_client.call_async(req_mode), 5.0)
+        if resp is None or not resp.success:
+            self.get_logger().warn('[goto_pose] SetRobotMode(1) failed — trying anyway.')
+
+        req_plan = SetPlanner.Request()
+        req_plan.planner_type = 5  # JOINT_SPACE
+        self._wait_for_future(self._planner_client.call_async(req_plan), 5.0)
+
+        req_gen = TrajectoryGeneration.Request()
+        req_gen.target_joint_positions = list(target)
+        gen_resp = self._wait_for_future(self._gen_client.call_async(req_gen), 15.0)
+        if gen_resp is None or not gen_resp.success or not gen_resp.trajectory:
+            msg = gen_resp.message if gen_resp else 'timeout'
+            return False, f'Planning failed: {msg}'
+
+        if not self._exec_client.wait_for_server(timeout_sec=10.0):
+            return False, 'Action server not available.'
+
+        exec_goal = SendTrajectory.Goal()
+        exec_goal.target_joint_positions = list(target)
+        gh_future = self._exec_client.send_goal_async(exec_goal)
+        gh = self._wait_for_future(gh_future, 10.0)
+        if gh is None or not gh.accepted:
+            return False, 'Goal rejected.'
+
+        result = self._wait_for_future(gh.get_result_async(), 120.0)
+        if result is None or not result.result.success:
+            msg = result.result.message if result else 'timeout'
+            return False, f'Execution failed: {msg}'
+
+        return True, ''
+
+    def _restore_teach_mode(self):
+        req_mode = SetRobotMode.Request()
+        req_mode.robot_mode = 0  # ROBOT_MODE_MANUAL
+        self._wait_for_future(self._robot_mode_client.call_async(req_mode), 5.0)
+
+        req_safe = SetSafetyMode.Request()
+        req_safe.safety_mode  = 2  # SAFETY_MODE_RECOVERY (teach)
+        req_safe.safety_event = 1  # SAFETY_MODE_EVENT_MOVE
+        self._wait_for_future(self._safety_mode_client.call_async(req_safe), 5.0)
+
+    def _wait_for_future(self, future, timeout: float):
+        start = time.monotonic()
+        while not future.done():
+            if time.monotonic() - start > timeout:
+                self.get_logger().error(f'[wait] Timeout ({timeout:.0f}s).')
+                return None
+            time.sleep(0.05)
+        return future.result()
+
+    # =========================================================================
     # Écriture YAML
     # =========================================================================
 
@@ -427,13 +531,10 @@ class PoseSaverNode(Node):
             'metadata': {
                 'saved_at':    datetime.now().isoformat(timespec='seconds'),
                 'total_poses': len(self._poses),
-                'joint_order_raw':   'J1, J2, J3, J4, J5, J6  (ordre natif /dsr01/joint_states)',
-                'joint_order_calib': 'J1, J2, J4, J5, J3, J6  (ordre CALIBRATION_POSES)',
+                'joint_order': 'J1, J2, J3, J4, J5, J6  (ordre natif Jazzy)',
             },
             # Détail complet de chaque pose
             'poses': self._poses,
-            # Prêt à copier dans CALIBRATION_POSES
-            'calibration_poses_ready': [p['calib_order'] for p in self._poses],
         }
 
         os.makedirs(os.path.dirname(os.path.abspath(self._output)), exist_ok=True)
@@ -450,13 +551,11 @@ class PoseSaverNode(Node):
 
     @staticmethod
     def _default_output_path() -> str:
-        """Retourne le chemin par défaut dans le dossier config/ du package."""
-        pkg_root = os.path.join(
-            os.path.dirname(__file__),  # leeloo_calibration/
-            '..',                       # racine du package source
+        """Retourne le chemin par défaut dans le dossier config/ du package installé."""
+        return os.path.join(
+            get_package_share_directory('leeloo_calibration'),
             'config',
             'calibration_poses.yaml')
-        return os.path.normpath(pkg_root)
 
 
 # =============================================================================
@@ -466,7 +565,7 @@ class PoseSaverNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = PoseSaverNode()
-    executor = MultiThreadedExecutor(num_threads=2)
+    executor = MultiThreadedExecutor(num_threads=3)
     executor.add_node(node)
     try:
         executor.spin()

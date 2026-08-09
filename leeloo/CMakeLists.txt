@@ -14,6 +14,7 @@ find_package(trajectory_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(curobo_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
 
 
@@ -34,7 +35,7 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(execute_trajectory src/execute_trajectory.cpp)
-ament_target_dependencies(execute_trajectory rclcpp std_msgs dsr_msgs2 trajectory_msgs)
+ament_target_dependencies(execute_trajectory rclcpp std_msgs std_srvs dsr_msgs2 trajectory_msgs)
 
 add_executable(ridgeback_control src/ridgeback_control.cpp)
 ament_target_dependencies(ridgeback_control rclcpp std_msgs geometry_msgs)
@@ -71,6 +72,12 @@ install(TARGETS
   execute_trajectory
   ridgeback_control
   voxel_map_publisher
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Nodes Python (package ament_cmake : scripts installés tels quels).
+install(PROGRAMS
+  scripts/voxel_dataset_recorder.py
   DESTINATION lib/${PROJECT_NAME}
 )
 ament_package()

@@ -11,6 +11,44 @@ RUN apt-get update && apt-get install -y software-properties-common curl \
         ros-jazzy-realsense2-* \
     && rm -rf /var/lib/apt/lists/* || true
 
+# Add camera OAK-D SR (depthai-ros v3)
+RUN apt-get update && apt-get install -y \
+        ros-jazzy-depthai-ros-v3 \
+    && rm -rf /var/lib/apt/lists/* || true
+
+# ── libusb SANS backend udev, pour l'OAK-D ───────────────────────────────────
+# Sans ça, le driver boucle sur :
+#   "Failed to find device after booting: X_LINK_DEVICE_NOT_FOUND"
+# L'OAK-D se ré-énumère sur le bus USB quand il boote (idProduct 2485 → f63b).
+# Le libusb de Noble est compilé AVEC le backend udev, qui apprend ce genre
+# d'événement hotplug via le démon udev — démon qui ne tourne PAS dans un
+# conteneur. libusb ne voit donc jamais la caméra réapparaître. Compilé
+# --disable-udev, il scanne directement /dev/bus/usb (bind-monté) et la retrouve.
+# C'est pour la même raison que le wheel Python depthai fonctionne : les wheels
+# manylinux embarquent un libusb sans udev.
+# NB : c'est le backend qui compte, pas la version — 1.0.28 compilé AVEC udev
+# échoue exactement comme le 1.0.27 système (vérifié).
+# Installé dans /opt/libusb-noudev, hors du ldconfig système : injecté uniquement
+# dans le driver OAK par LD_PRELOAD depuis bringup_leeloo.launch.py, pour ne pas
+# changer le libusb que voit l'Azure Kinect (qui, lui, fonctionne tel quel).
+RUN apt-get update && apt-get install -y --no-install-recommends wget && \
+    wget -q https://github.com/libusb/libusb/releases/download/v1.0.28/libusb-1.0.28.tar.bz2 \
+        -O /tmp/libusb.tar.bz2 && \
+    tar -xjf /tmp/libusb.tar.bz2 -C /tmp && \
+    cd /tmp/libusb-1.0.28 && \
+    ./configure --prefix=/opt/libusb-noudev --disable-static --disable-udev && \
+    make -j"$(nproc)" && make install && \
+    cd / && rm -rf /tmp/libusb-1.0.28 /tmp/libusb.tar.bz2 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Confort pour les tests manuels (docker exec -it ... bash) : LD_PRELOAD posé au
+# lancement du shell, uniquement pour les sessions interactives. bringup_leeloo
+# le fait déjà lui-même, scopé au seul driver OAK (GroupAction) — ce .bashrc ne
+# le remplace pas, il évite juste de le taper à la main en test manuel.
+RUN echo '' >> /root/.bashrc && \
+    echo '# OAK-D SR : libusb sans backend udev (fix X_LINK_DEVICE_NOT_FOUND en conteneur)' >> /root/.bashrc && \
+    echo 'export LD_PRELOAD=/opt/libusb-noudev/lib/libusb-1.0.so.0' >> /root/.bashrc
+
 # libk4a1.4 arm64 — Microsoft multiarch repo (Ubuntu 18.04), only version with arm64 packages
 # libk4a1.3 and libk4abt are NOT available for arm64
 RUN curl -sSL https://packages.microsoft.com/ubuntu/18.04/multiarch/prod/pool/main/libk/libk4a1.4/libk4a1.4_1.4.2_arm64.deb > /tmp/libk4a1.4_1.4.2_arm64.deb
@@ -24,7 +62,7 @@ RUN dpkg -i /tmp/libk4a1.4-dev_1.4.2_arm64.deb
 # The standard libk4a1.4 depth engine requires OpenCL GPU, which is unavailable
 # on JetPack 6.x/7.x (NVIDIA removed OpenCL from Orin). The 1.4.0-alpha.4 package
 # ships a depth engine compiled for ARM64 without that dependency.
-RUN apt-get install -y unzip xvfb libgl1-mesa-dri && \
+RUN apt-get update && apt-get install -y unzip xvfb libgl1-mesa-dri && \
     curl -sSL https://www.nuget.org/api/v2/package/Microsoft.Azure.Kinect.Sensor/1.4.0-alpha.4 \
         -o /tmp/k4a-alpha.nupkg && \
     unzip -jo /tmp/k4a-alpha.nupkg \
@@ -95,7 +133,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ENV ROS_DOMAIN_ID=0
-ENV CYCLONEDDS_URI=/home/ros2_ws/src/capacitynet/config/profile.xml'
+ENV CYCLONEDDS_URI=/home/ros2_ws/src/capacitynet/config/profile.xml
 
 ENTRYPOINT ["/docker_entrypoint.sh"]
 CMD ["bash"]

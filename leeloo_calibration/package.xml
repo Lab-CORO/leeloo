@@ -13,6 +13,7 @@
   <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
+  <depend>ament_index_python</depend>
   <depend>leeloo_msgs</depend>
   <depend>curobo_msgs</depend>
   <depend>std_srvs</depend>
@@ -21,7 +22,8 @@
   <depend>trajectory_msgs</depend>
   <depend>builtin_interfaces</depend>
   <depend>dsr_msgs2</depend>
-
+  <depend>easy_handeye2_msgs</depend>
+  <depend>ros2_markertracker_interfaces</depend>
 
   <buildtool_depend>ament_python</buildtool_depend>
 
