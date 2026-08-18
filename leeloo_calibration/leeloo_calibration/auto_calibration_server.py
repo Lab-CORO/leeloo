@@ -29,6 +29,7 @@ from datetime import datetime
 
 import yaml
 import rclpy
+from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from rclpy.action import ActionServer, ActionClient, GoalResponse, CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
@@ -42,9 +43,10 @@ from curobo_msgs.action import SendTrajectory
 from leeloo_msgs.action import RunCalibration
 from ros2_markertracker_interfaces.msg import FiducialMarkerArray
 
-_DEFAULT_POSES_FILE = '/home/ros2_ws/src/leeloo_calibration/config/calibration_poses.yaml'
+_CALIB_CONFIG_DIR   = os.path.join(get_package_share_directory('leeloo_calibration'), 'config')
+_DEFAULT_POSES_FILE = os.path.join(_CALIB_CONFIG_DIR, 'calibration_poses.yaml')
 _DEFAULT_WAIT_S     = 5.0
-_RESULT_DIR         = '/home/ros2_ws/src/leeloo_calibration/config'
+_RESULT_DIR         = _CALIB_CONFIG_DIR
 
 
 @dataclass
@@ -67,7 +69,7 @@ class AutoCalibrationNode(Node):
         self.declare_parameter('set_planner_service',   '/curobo_trajectory_planner/set_planner')
         self.declare_parameter('calibration_poses_file', _DEFAULT_POSES_FILE)
         self.declare_parameter('calibration_result_file',
-            '/home/ros2_ws/src/leeloo_calibration/config/kinect_hand_eye_result.yaml')
+            os.path.join(_CALIB_CONFIG_DIR, 'kinect_hand_eye_result.yaml'))
         self.declare_parameter('settle_time_s', 2.0)
         self.declare_parameter('reload_calibration_service',
             '/kinect_tf_computation_node/reload_calibration')
@@ -87,7 +89,7 @@ class AutoCalibrationNode(Node):
         # ---- Paramètres debug capture -------------------------------------------
         self.declare_parameter('enable_debug_capture', False)
         self.declare_parameter('debug_capture_file',
-            '/home/ros2_ws/src/leeloo_calibration/config/calibration_debug_samples.yaml')
+            os.path.join(_CALIB_CONFIG_DIR, 'calibration_debug_samples.yaml'))
         # '/fiducial_markers' est un nom de topic ABSOLU dans markertracker_node.py
         # (_result_marker_topic = '/fiducial_markers') -> le namespace='/ros2_markertracker'
         # du launch file n'a AUCUN effet dessus (seuls les noms relatifs sont préfixés

@@ -30,11 +30,17 @@ le résultat de calibration sauvegardé pour publier la TF de la Kinect — il v
 donc dans leeloo/launch/tf.launch.py et tourne en permanence.
 """
 
+import os
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction, TimerAction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node, SetRemap
+
+_CALIB_CONFIG_DIR = os.path.join(
+    get_package_share_directory('leeloo_calibration'), 'config')
 
 
 # Suffixes relatifs des services publiés par easy_handeye2 sous
@@ -259,8 +265,8 @@ def generate_launch_description():
                 parameters=[{
                     'enable_debug_capture': False,
                     'default_handeye_server': 'kinect',
-                    'calibration_poses_file': '/home/ros2_ws/src/leeloo_calibration/config/calibration_poses.yaml',
-                    'calibration_result_file': '/home/ros2_ws/src/leeloo_calibration/config/kinect_hand_eye_result.yaml',
+                    'calibration_poses_file': os.path.join(_CALIB_CONFIG_DIR, 'calibration_poses.yaml'),
+                    'calibration_result_file': os.path.join(_CALIB_CONFIG_DIR, 'kinect_hand_eye_result.yaml'),
                     'reload_calibration_service': '/kinect_tf_computation_node/reload_calibration',
                     'server_wait_timeout_s': 30.0,
                 }],

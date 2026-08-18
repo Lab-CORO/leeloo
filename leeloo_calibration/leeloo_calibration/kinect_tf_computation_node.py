@@ -11,6 +11,7 @@ from tf2_ros import StaticTransformBroadcaster, TransformListener, Buffer
 import ros2_numpy
 import numpy as np
 from numpy.linalg import inv
+from ament_index_python.packages import get_package_share_directory
 
 
 class kinectTFComputationNode(Node):
@@ -25,7 +26,8 @@ class kinectTFComputationNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=False)
 
         self.declare_parameter('calibration_result_file',
-            '/home/ros2_ws/src/leeloo_calibration/config/kinect_hand_eye_result.yaml')
+            os.path.join(get_package_share_directory('leeloo_calibration'),
+                          'config', 'kinect_hand_eye_result.yaml'))
 
         # Robot base frame the camera is calibrated against. Default 'dsr01/world'
         # (Doosan arm root once frame_prefix='dsr01/' is applied; world≡base_link

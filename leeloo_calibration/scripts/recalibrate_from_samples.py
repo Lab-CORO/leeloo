@@ -11,14 +11,25 @@ Aucune dépendance ROS — seulement numpy, cv2, transforms3d, yaml.
 """
 
 import argparse
+import os
 import sys
 import yaml
 import numpy as np
 import cv2
 import transforms3d
 
-
-DEFAULT_INPUT = '/home/ros2_ws/src/leeloo_calibration/config/calibration_debug_samples.yaml'
+try:
+    from ament_index_python.packages import get_package_share_directory
+    DEFAULT_INPUT = os.path.join(
+        get_package_share_directory('leeloo_calibration'),
+        'config', 'calibration_debug_samples.yaml')
+except Exception:
+    # Standalone use (module docstring: "Aucune dépendance ROS") — fall back
+    # to a path relative to this script's checkout instead of a machine-
+    # specific absolute path.
+    DEFAULT_INPUT = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), '..', 'config',
+        'calibration_debug_samples.yaml')
 DEFAULT_THRESHOLD = 2.0
 DEFAULT_METHOD = 'Tsai-Lenz'
 MIN_SAMPLES = 3  # OpenCV demande au minimum 3 points pour calibrateHandEye

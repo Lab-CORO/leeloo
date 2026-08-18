@@ -7,6 +7,7 @@ from launch_ros.actions import Node, SetRemap
 from launch_ros.parameter_descriptions import ParameterValue
 import os
 import shutil
+import tempfile
 import yaml
 
 from ament_index_python.packages import get_package_share_directory
@@ -15,18 +16,44 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     dsr_bringup_share = get_package_share_directory('dsr_bringup2')
     leeloo_share       = get_package_share_directory('leeloo')
+    curobo_ros_share   = get_package_share_directory('curobo_ros')
 
     dsr_launch_file = os.path.join(dsr_bringup_share, 'launch', 'dsr_bringup2_rviz.launch.py')
 
     # CuRobo config — read base_link and urdf_path from the YAML so they stay
     # consistent with what the planner reads at runtime (single source of truth).
-    leeloo_curobo_config = os.path.join(leeloo_share, 'config', 'leeloo_curobo.yaml')
+    #
+    # robot_config_file is handed to cuRobo as a bare path (config_wrapper_motion.py
+    # passes ConfigManager.robot_config_file straight to MotionPlannerCfg.create),
+    # so cuRobo parses urdf_path/asset_root_path itself — ConfigManager's own
+    # load_yaml() of this file is never consulted for those fields. The checked-in
+    # leeloo_curobo.yaml therefore still carries the old hardcoded
+    # /home/ros2_ws/src/... values (they need to resolve for a standalone cuRobo
+    # load outside this launch file too). Rewrite them here to the install-space
+    # share/ layout, same pattern as the sim-only XML injection in
+    # leeloo_gazebo.launch.py, and hand cuRobo the patched copy instead of editing
+    # the source YAML.
+    leeloo_curobo_config_src = os.path.join(leeloo_share, 'config', 'leeloo_curobo.yaml')
     leeloo_urdf = os.path.join(leeloo_share, 'urdf', 'leeloo.urdf')
-    with open(leeloo_curobo_config, 'r') as f:
+    with open(leeloo_curobo_config_src, 'r') as f:
         _cfg = yaml.safe_load(f)
     _kin = _cfg.get('robot_cfg', {}).get('kinematics', {})
     curobo_base_link = _kin.get('base_link', 'base_link')  # noqa: F841 (documente la cohérence attendue avec base_link ci-dessous)
-    curobo_urdf_path = _kin.get('urdf_path', os.path.join(leeloo_share, 'urdf', 'leeloo.urdf'))  # noqa: F841
+    # asset_root_path/leeloo/urdf/leeloo.urdf must still equal urdf_path after the
+    # rewrite (meshes are referenced relative to asset_root_path); dirname(leeloo_share)
+    # + '/leeloo/...' reduces back to leeloo_share + '/...', so this preserves the
+    # exact relative layout the checked-in values encoded.
+    if 'urdf_path' in _kin:
+        _kin['urdf_path'] = leeloo_urdf
+    if 'asset_root_path' in _kin:
+        _kin['asset_root_path'] = os.path.dirname(leeloo_share)
+    curobo_urdf_path = _kin.get('urdf_path', leeloo_urdf)  # noqa: F841
+
+    _patched_curobo_config = tempfile.NamedTemporaryFile(
+        mode='w', suffix='_leeloo_curobo.yaml', delete=False)
+    yaml.safe_dump(_cfg, _patched_curobo_config)
+    _patched_curobo_config.close()
+    leeloo_curobo_config = _patched_curobo_config.name
 
     # Gripper Robotiq 2F-85 : ros2_control_node a besoin du <ros2_control> ajouté
     # dans leeloo.urdf (driver réel, COM_port /dev/ttyUSB0) → on lui passe le même
@@ -112,8 +139,8 @@ def generate_launch_description():
         DeclareLaunchArgument('model',    default_value='m1013'),
         DeclareLaunchArgument('gui',      default_value='False'),
 
-        DeclareLaunchArgument('cameras_config_file', default_value='/home/ros2_ws/src/leeloo/config/cameras.yaml'),
-        DeclareLaunchArgument('world_file',          default_value='/home/ros2_ws/src/leeloo/config/leeloo_world.yaml'),
+        DeclareLaunchArgument('cameras_config_file', default_value=os.path.join(leeloo_share, 'config', 'cameras.yaml')),
+        DeclareLaunchArgument('world_file',          default_value=os.path.join(leeloo_share, 'config', 'leeloo_world.yaml')),
         DeclareLaunchArgument('voxel_size',          default_value='0.02'),
 
         # MPC diagnostic CSVs (mpc_diag_*.csv + speedj_publish_*.csv), off by
@@ -124,6 +151,26 @@ def generate_launch_description():
         # file. Launch with mpc_debug:=true to keep them across restarts.
         DeclareLaunchArgument('mpc_debug', default_value='false'),
         DeclareLaunchArgument('diag_dir',  default_value='/home/ros2_ws/diag'),
+        DeclareLaunchArgument('diag_dir',  default_value='/home/ros2_ws/diag'),
+
+        # MPC cost/optimizer config, as editable YAML instead of values baked
+        # into mpc_planner.py -- see curobo_ros/config/mpc/{mppi,lbfgs}_mpc.yaml
+        # for the shipped defaults and their tuning history. Override with e.g.
+        # `ros2 launch leeloo bringup_leeloo.launch.py mpc_lbfgs_config_file:=/path/to/custom.yaml`.
+        DeclareLaunchArgument(
+            'mpc_mppi_config_file',
+            default_value=os.path.join(curobo_ros_share, 'config', 'mpc', 'mppi_mpc.yaml')),
+        DeclareLaunchArgument(
+            'mpc_lbfgs_config_file',
+            default_value=os.path.join(curobo_ros_share, 'config', 'mpc', 'lbfgs_reactive.yaml')),
+
+        # Outgoing accel clamp override (JointSpeedStrategy._clamp_velocities,
+        # deg/s^2). Referenced below but was never declared, which raised at
+        # launch resolution ("launch configuration 'max_joint_accel_dps' does
+        # not exist"). Default matches the m1013 descriptor's own default (45)
+        # so an unset launch arg changes nothing. Also live-settable without a
+        # relaunch via `ros2 param set <node> max_joint_accel_dps <value>`.
+        DeclareLaunchArgument('max_joint_accel_dps', default_value='1000.0'),
 
         # ── Doosan bringup (scope global : ne pas casser les internes dsr01) ───
         # En sim : remplacé par dsr_sim_bridge (leeloo_gazebo), qui consomme le
@@ -201,7 +248,7 @@ def generate_launch_description():
                 parameters=[{
                     'robot_config_file': leeloo_curobo_config,
                     'urdf_path': leeloo_urdf,
-                    'planner_type': 'mpc',
+                    'planner_type': 'classic',
                     'interpolation_dt': 0.03,
                     'cameras_config_file': LaunchConfiguration('cameras_config_file'),
                     'base_link': "dsr01/world",
@@ -211,7 +258,7 @@ def generate_launch_description():
                     'mapper_grid_center': [0.0, 0.0, 0.0],
                     'mapper_image_width': 1280,
                     'mapper_image_height': 720,
-                    'mpc_solver_type': 'mppi_acceleration',#mppi_acceleration
+                    'mpc_solver_type': 'lbfgs_bspline',#mppi_acceleration,lbfgs_bspline
                     # 5, not 10: doubling this (test 2026-08-07) doubled solve_ms
                     # from 105ms to 199ms median against a 240ms
                     # mpc_command_interval, leaving ~40ms of margin. The producer
@@ -219,8 +266,10 @@ def generate_launch_description():
                     # 212-219ms), missed command ticks, and convergence got worse,
                     # not better. Raise mpc_command_interval first if this is ever
                     # increased again.
-                    'mpc_warm_start_iters': 5,
-                    'mpc_cold_start_iters': 10,
+                    'mpc_warm_start_iters': 25,
+                    'mpc_cold_start_iters': 100,
+                    'mpc_mppi_config_file': LaunchConfiguration('mpc_mppi_config_file'),
+                    'mpc_lbfgs_config_file': LaunchConfiguration('mpc_lbfgs_config_file'),
                     # Both args were DECLARED above but never passed to the node,
                     # so mpc_debug stayed at its in-code default (False) and a run
                     # produced no CSV at all unless someone remembered to
@@ -229,10 +278,12 @@ def generate_launch_description():
                     # explicit value_type is required: a LaunchConfiguration is a
                     # string substitution, and 'false' as a string would not match
                     # the node's bool parameter type.
-                    'mpc_debug': ParameterValue(
+                    'lbfgs_debug': ParameterValue(
                         LaunchConfiguration('mpc_debug'), value_type=bool),
                     'diagnostic_csv_dir': ParameterValue(
                         LaunchConfiguration('diag_dir'), value_type=str),
+                    'max_joint_accel_dps': ParameterValue(
+                        LaunchConfiguration('max_joint_accel_dps'), value_type=float),
                     'max_attempts': 10,
                     # Sparse voxel topic publish rate (Hz); <= 0 disables it.
                     'sparse_voxel_publish_rate': 5.0,

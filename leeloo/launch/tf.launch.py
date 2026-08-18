@@ -102,7 +102,9 @@ def generate_launch_description():
                 respawn_delay=2.0,
                 condition=_kinect_enabled,
                 parameters=[{
-                    'calibration_result_file': '/home/ros2_ws/src/leeloo_calibration/config/kinect_hand_eye_result.yaml',
+                    'calibration_result_file': os.path.join(
+                        get_package_share_directory('leeloo_calibration'),
+                        'config', 'kinect_hand_eye_result.yaml'),
                     'robot_base_frame': 'dsr01/world',
                 }],
             ),
